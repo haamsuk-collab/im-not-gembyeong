@@ -1,0 +1,239 @@
+{
+ "collected": "2026-10-12",
+ "queries_run": 187,
+ "posts_read": 909,
+ "posts_by_platform": {
+  "threads": 534,
+  "x": 375
+ },
+ "posts_by_language": {
+  "ko": 336,
+  "en": 573
+ },
+ "negative": 343,
+ "negative_by_platform": {
+  "threads": 175,
+  "x": 168
+ },
+ "negative_by_language": {
+  "ko": 84,
+  "en": 259
+ },
+ "negative_by_surface": {
+  "app": 56,
+  "model": 163,
+  "cli_or_antigravity": 81,
+  "integration": 34,
+  "other": 9
+ },
+ "negative_agentic": 86,
+ "negative_agentic_with_A_C_D_E": "18",
+ "negative_with_A_C_D_E": 57,
+ "by_category": {
+  "A": 1,
+  "B": 39,
+  "C": 24,
+  "D": 18,
+  "E": 19,
+  "F": 25,
+  "G": 35,
+  "H": 74,
+  "I": 54,
+  "J": 6,
+  "K": 61,
+  "L": 90,
+  "M": 13,
+  "N": 99
+ },
+ "by_category_platform": {
+  "A": {
+   "x": 1
+  },
+  "B": {
+   "threads": 12,
+   "x": 27
+  },
+  "C": {
+   "threads": 15,
+   "x": 9
+  },
+  "D": {
+   "threads": 5,
+   "x": 13
+  },
+  "E": {
+   "threads": 12,
+   "x": 7
+  },
+  "F": {
+   "threads": 9,
+   "x": 16
+  },
+  "G": {
+   "threads": 15,
+   "x": 20
+  },
+  "H": {
+   "threads": 38,
+   "x": 36
+  },
+  "I": {
+   "threads": 28,
+   "x": 26
+  },
+  "J": {
+   "threads": 2,
+   "x": 4
+  },
+  "K": {
+   "threads": 36,
+   "x": 25
+  },
+  "L": {
+   "threads": 58,
+   "x": 32
+  },
+  "M": {
+   "threads": 5,
+   "x": 8
+  },
+  "N": {
+   "threads": 49,
+   "x": 50
+  }
+ },
+ "by_category_language": {
+  "A": {
+   "en": 1
+  },
+  "B": {
+   "ko": 10,
+   "en": 29
+  },
+  "C": {
+   "en": 14,
+   "ko": 10
+  },
+  "D": {
+   "en": 14,
+   "ko": 4
+  },
+  "E": {
+   "ko": 8,
+   "en": 11
+  },
+  "F": {
+   "ko": 5,
+   "en": 20
+  },
+  "G": {
+   "en": 29,
+   "ko": 6
+  },
+  "H": {
+   "ko": 16,
+   "en": 58
+  },
+  "I": {
+   "ko": 11,
+   "en": 43
+  },
+  "J": {
+   "ko": 4,
+   "en": 2
+  },
+  "K": {
+   "ko": 17,
+   "en": 44
+  },
+  "L": {
+   "ko": 20,
+   "en": 70
+  },
+  "M": {
+   "ko": 4,
+   "en": 9
+  },
+  "N": {
+   "en": 74,
+   "ko": 25
+  }
+ },
+ "by_category_agentic": {
+  "A": 1,
+  "B": 1,
+  "C": 6,
+  "D": 6,
+  "E": 5,
+  "F": 15,
+  "G": 1,
+  "H": 30,
+  "I": 29,
+  "J": 0,
+  "K": 20,
+  "L": 37,
+  "M": 1,
+  "N": 17
+ },
+ "dated_posts": 337,
+ "date_range": [
+  "2023-12-07",
+  "2026-10-08"
+ ],
+ "by_year": {
+  "2023": 1,
+  "2024": 23,
+  "2025": 127,
+  "2026": 186
+ },
+ "models_named": [
+  [
+   "3.5 Flash",
+   15
+  ],
+  [
+   "3.1 Pro",
+   15
+  ],
+  [
+   "Nano Banana",
+   11
+  ],
+  [
+   "2.5 Pro",
+   10
+  ],
+  [
+   "Pro",
+   9
+  ],
+  [
+   "3",
+   9
+  ],
+  [
+   "Nano Banana Pro",
+   7
+  ],
+  [
+   "3 Flash",
+   6
+  ],
+  [
+   "3 Pro",
+   4
+  ],
+  [
+   "3.1",
+   4
+  ],
+  [
+   "3.8 Flash",
+   4
+  ],
+  [
+   "3.0 Pro",
+   3
+  ]
+ ]
+}

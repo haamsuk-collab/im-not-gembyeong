@@ -4,10 +4,12 @@
 
 *Gembyeong* (젬병) is Korean for "hopeless at it", and it sounds like Gem-ini. Gemini, show the receipt.
 
-In the code, the commands and the documents the program is called G1. (That name is a pun as well: one g,
-the gravity that Antigravity does without.) G1 is a small program that sits beside the Antigravity CLI (`agy`)
-while Gemini works on your code. It has one job: to make sure that "done" means done, and that work survives
-when a session ends.
+Korean version: [README.ko.md](README.ko.md)
+
+In the code, the commands and the documents the program is called G1. (That name is a pun as well: one g, the
+gravity that Antigravity does without.) G1 is a small program that sits beside the Antigravity CLI (`agy`) while
+Gemini works on your code. It has one job: to make sure that "done" means done, and that work survives when a
+session ends.
 
 You install it once. After that it works in every project without any action from you.
 
@@ -17,13 +19,45 @@ You ask an AI coding agent to fix a bug. Two minutes later it says: "Done. The t
 
 Two things can be wrong with that sentence.
 
-1. It may not be true. We measured this with Gemini 3.8 Flash: when a tool call was blocked, the model
-   still answered "DONE" in 3 of 8 runs, although nothing had been done.
-2. It may be forgotten. When the session ends, the agent's memory ends with it. The next session starts
-   from zero and does not know what was done, what remains, or what "done" was supposed to mean.
+1. It may not be true. We measured this with Gemini 3.8 Flash: when a tool call was blocked, the model still
+   answered "DONE" in 3 of 8 runs, although nothing had been done.
+2. It may be forgotten. When the session ends, the agent's memory ends with it. The next session starts from zero
+   and does not know what was done, what remains, or what "done" was supposed to mean.
 
 An agent that says "done" is like a student who grades their own exam. G1 is the referee: it holds the answer key,
 runs the test itself, and writes the result in a book that cannot be erased.
+
+## What people say when Gemini fails
+
+We did not want to guess what goes wrong. So we collected what users say. On 12 October 2026 we searched Threads and
+X for posts about Gemini in Korean and in English, with 187 search queries, and read 909 posts
+(534 from Threads, 375 from X; 336 in Korean, 573 in English; posted between December 2023 and
+October 2026). 343 of them are a user's own complaint. Each complaint got one or more of these labels.
+
+| What the user complains about | Posts | G1's answer |
+|---|---|---|
+| Got dumber, general disappointment | 99 | none; G1 does not change the model |
+| Product, app, forced integration | 90 | none |
+| Errors, speed, outages | 74 | none; the host's problem |
+| Worse than Claude, GPT, Codex | 61 | none |
+| Limits, pricing, plans | 54 | none |
+| Hallucinated facts and sources | 39 | none for facts; code claims are tested, not believed |
+| Refusals, censorship, lazy answers | 35 | none |
+| Code broken or deleted, bad code | 25 | pinned test files; the checks must pass on a copy before "done" |
+| Ignores instructions, changes unrelated code | 24 | a contract with a scope; writes outside it are refused or caught at the receipt |
+| Forgets context, loses the thread | 19 | the ledger; every session starts from the record, not from memory |
+| Loops, repeats, endless thinking | 18 | a continuation budget; a turn that changed nothing ends |
+| Sycophancy, apologies, gaslighting | 13 | the agent's words are never evidence |
+| Korean or language quality | 6 | none |
+| Says it finished or tested when it did not | 1 | the receipt; completion exists only when G1 ran the checks |
+
+86 of the 343 complaints are about Gemini doing work on code or files (Gemini CLI, Antigravity, Cursor, "it
+edited my repo"). In that group the four labels G1 answers, false reports, ignored instructions, lost context and
+loops, appear in 18 posts; across all 343 complaints, in 57.
+
+Read the table as a map, not as a score. The posts are what search engines index; neither platform allows search
+without an account, so the sample is wide but not complete. The method, the counts by platform and language, and
+links to the posts behind each label are in `research/complaints/`. The posts themselves are not in this repository.
 
 ## What a referee needs
 
@@ -64,19 +98,19 @@ The user's whole instruction was: *"Make tests/test_stats.py pass by fixing src/
 1. Session start. G1 enrols the project, which it had never seen, and injects: *"No active contract. For durable work,
    write a proposal to `.../proposals/<id>.json`."*
 2. The agent writes a proposal. The proposal names the goal and one criterion: "the test passes". It names one
-   check, `python3 tests/test_stats.py`, the file the check depends on (`src/stats.py`), the files the agent
-   may edit (`src/`), and the test file that must stay fixed (`tests/test_stats.py`).
-3. G1 validates the proposal before the next model call. It checks the shape, then runs the check on the
-   untouched code. The check must fail now, because a check that already passes proves nothing about the work.
-   This is the **red baseline**. G1 also records the hash of the test file. The proposal becomes a contract.
+   check, `python3 tests/test_stats.py`, the file the check depends on (`src/stats.py`), the files the agent may
+   edit (`src/`), and the test file that must stay fixed (`tests/test_stats.py`).
+3. G1 validates the proposal before the next model call. It checks the shape, then runs the check on the untouched
+   code. The check must fail now, because a check that already passes proves nothing about the work. This is the
+   **red baseline**. G1 also records the hash of the test file. The proposal becomes a contract.
 4. The agent edits the code. It runs the test as often as it likes. If it tried to edit the test file, or a file
    outside `src/`, G1 would refuse.
 5. The agent stops. G1 copies the code to a scratch directory and runs the check there, in a clean environment.
    The check passes. Then G1 breaks `src/stats.py` in a second copy and runs the check again. This time the check
    must fail; if it did not, it would not depend on the code at all. This is the **canary**.
 6. G1 compares the file tree with the tree it recorded at contract time. Only `src/stats.py` changed.
-7. G1 writes a receipt into the ledger and marks the task complete. The agent's final message said "I have
-   updated median". That message was never an input to this decision.
+7. G1 writes a receipt into the ledger and marks the task complete. The agent's final message said "I have updated
+   median". That message was never an input to this decision.
 
 If step 5 had failed, G1 would have recorded why, and it would ask the agent for one more turn only if fewer checks
 failed than last time.
@@ -88,8 +122,8 @@ failed than last time.
 - Completion is one function. It returns "complete" only from checks that G1 ran itself. Any other input, including
   a model's opinion, can only say "no". A test enumerates every combination of inputs and proves that nothing can say
   "yes" without executed evidence.
-- G1 protects itself. Every hook entry contains the hash of G1's own code; if the code changes during a session,
-  the hooks refuse to run. If the agy binary changes, G1 withholds completion until the binary has been re-measured.
+- G1 protects itself. Every hook entry contains the hash of G1's own code; if the code changes during a session, the
+  hooks refuse to run. If the agy binary changes, G1 withholds completion until the binary has been re-measured.
 - G1 notices a forged history. Outside the project, G1 keeps an anchor: the last record it wrote. A ledger that ends
   anywhere else was changed by something other than G1, and the project is locked until you decide with `g1 repair`.
 - G1 never uses the agent's words as evidence. It reads the agent's transcript for one purpose: to count the tool
@@ -122,22 +156,19 @@ restores them. To remove G1, run `~/src/g1/bin/g1 uninstall`; it removes only it
 Useful commands, all optional:
 
 ```sh
-~/src/g1/bin/g1 status .     # what G1 knows about the current project
-~/src/g1/bin/g1 audit .      # recompute every receipt and completion from the ledger
-~/src/g1/bin/g1 host-verify  # after re-running the probes on a new agy version
-~/src/g1/bin/g1 repair .     # after an integrity lockdown: see what changed, then --accept-ledger, --restore or --forget
+~/src/g1/bin/g1 status .      # what G1 knows about the current project
+~/src/g1/bin/g1 audit .       # recompute every receipt and completion from the ledger
+~/src/g1/bin/g1 host-verify   # after re-running the probes on a new agy version
+~/src/g1/bin/g1 repair .      # after an integrity lockdown: see what changed, then --accept-ledger, --restore or --forget
 ~/src/g1/bin/g1 challenges .  # list the challenges a reviewing model wrote (nothing runs yet)
 ~/src/g1/bin/g1 challenges . --run   # run their checks (another model's code, with your rights) and record verdicts
-~/src/g1/bin/g1 challenge . ID accept   # or: reject REASON; accepting makes the defect a contract
 ```
-
-Requirements: Python 3.9 or later, `agy` on your PATH. Tests: `python3 -m unittest tests.test_core -v`.
 
 ## What it costs, measured
 
-We measured G1 on 137 real agy sessions with gemini-3.8-flash-high (and one with Claude Opus 5.5 as a reviewer). The numbers below come from an independent
-oracle: the runner re-ran the original tests on the final code, or checked the file tree itself. Neither G1 nor
-the agent supplied any outcome.
+We measured G1 on 137 real agy sessions with gemini-3.8-flash-high (and one with Claude Opus 5.5 as a reviewer). The
+numbers below come from an independent oracle: the runner re-ran the original tests on the final code, or checked the
+file tree itself. Neither G1 nor the agent supplied any outcome.
 
 | Question | Answer |
 |---|---|
@@ -148,16 +179,23 @@ the agent supplied any outcome.
 | Can a second model find what Flash missed? | Once, end to end: Flash's library passed 43 of 44 hidden checks; Claude Opus 5.5 proved the missing one with a failing check in 73 s, with no false report; after the user accepted it, Flash fixed it under a receipt (44/44). |
 | Does the instinct rule change behaviour? | On six ambiguous or impossible tasks, Flash stopped and asked in 12 of 12 sessions with the rule and 12 of 12 without it. Not measurable on that class; no measurable cost either. |
 
-What we could not measure: on self-contained tasks with visible tests, Gemini 3.8 Flash never failed and never
-lied in 60 sessions. The cases where a referee matters most, large repositories and multi-day work, are not in
-this data yet. Details and limits: `docs/design.md` section 14 and `research/measure/`.
+What we could not measure: on self-contained tasks with visible tests, Gemini 3.8 Flash never failed and never lied in
+60 sessions. The cases where a referee matters most, large repositories and multi-day work, are not in this data yet.
+Details and limits: `docs/design.md` section 14 and `research/measure/`.
+
+## How the code was reviewed
+
+Five independent reviews read the code, each one a Gemini 3.8 Flash session inside agy with a written brief. Before
+the fifth, Claude Opus 5.5 and Claude Fable 5.1 reviewed the same code outside agy. Every finding was reproduced with
+the reviewer's own script before it was fixed, and every fix has a test named after the finding. The fifth review
+found nothing. The briefs, the reports and the answers are in `research/review/`. The suite has 126 tests.
 
 ## What G1 does not do
 
 - It does not make the model smarter. It does not change prompts, tools, or the agent's loop.
 - It does not use a second model as a judge. A judge can be talked into "yes"; a test cannot.
-- It does not replace agy's own features. Subagents, goal mode and parallel attempts stay native; G1 only
-  verifies their results.
+- It does not replace agy's own features. Subagents, goal mode and parallel attempts stay native; G1 only verifies
+  their results.
 - It cannot stop an agent that rewrites every G1 file consistently through the shell in one session, because all of
   G1 runs as your user. `docs/design.md` section 7.7 states this residual risk.
 
@@ -168,7 +206,8 @@ this data yet. Details and limits: `docs/design.md` section 14 and `research/mea
 | `docs/principles.md` | the eight principles G1 is built from, and how each one became a rule |
 | `docs/design.md` | the full design: every mechanism, the fact it proves, and where it came from |
 | `docs/host-agy.md` | what we measured about agy's hooks, including where the documentation was wrong |
-| `research/agy-hooks/` | the probes and raw records behind those measurements |
+| `research/complaints/` | the complaint study above: method, counts by platform and language, and links to the posts behind each label |
+| `research/agy-hooks/` | the probes and raw records behind the hook measurements |
 | `research/measure/` | the A/B runners and the results of all six measurement runs, and experiment C1 (challenges) |
 | `research/review/` | five independent reviews of the code and a pre-audit by two more reviewers, each finding with its reproduction and its fix; the fifth review found nothing |
 | `research/atoms/` | 696 design "atoms" taken from a predecessor harness, five other projects and one post series, each with a verdict |
@@ -181,7 +220,7 @@ src/g1/adapter/   agy.py, the only file that knows anything about agy
 tests/            126 tests: chain breaks, crash recovery, the completion function, gates, canary, anchors, auto-enrolment
 bin/g1            the command-line launcher
 docs/             principles, design, host contract
-research/         measurements, probes, atoms, A/B runs
+research/         complaints, measurements, probes, atoms, A/B runs, reviews
 ```
 
 ## License
