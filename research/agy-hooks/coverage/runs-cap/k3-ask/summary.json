@@ -1,0 +1,18 @@
+{
+ "name": "k3-ask",
+ "case": "ask",
+ "rc": 0,
+ "seconds": 15.9,
+ "status": "SUCCESS",
+ "nonce": "NONCE-ED48CF57",
+ "nonce_in_reply": false,
+ "files": [
+  "G1_STATE.md",
+  "README.md",
+  "out.txt"
+ ],
+ "response": "DONE",
+ "total_tokens": 40361,
+ "sequence": "SessionStart > PreInvocation[inv=0] > PreToolUse(write_to_file#2) > PostToolUse(write_to_file#2) > PostInvocation[inv=0] > PreInvocation[inv=1] > PreToolUse(view_file#4) > PostToolUse(view_file#4) > PostInvocation[inv=1] > PreInvocation[inv=2] > PostInvocation[inv=2] > Stop",
+ "stderr_tail": ""
+}

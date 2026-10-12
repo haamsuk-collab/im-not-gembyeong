@@ -1,0 +1,17 @@
+{
+ "name": "k2-inject-ephemeral",
+ "case": "inject_ephemeral",
+ "rc": 0,
+ "seconds": 9.3,
+ "status": "SUCCESS",
+ "nonce": "NONCE-BA0CB020",
+ "nonce_in_reply": true,
+ "files": [
+  "G1_STATE.md",
+  "README.md"
+ ],
+ "response": "NONCE-BA0CB020",
+ "total_tokens": 12880,
+ "sequence": "SessionStart > PreInvocation[inv=0] > PostInvocation[inv=0] > Stop",
+ "stderr_tail": ""
+}

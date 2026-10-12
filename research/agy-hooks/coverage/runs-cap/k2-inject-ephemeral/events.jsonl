@@ -1,0 +1,4 @@
+{"event": "SessionStart", "t": 1791700189.5619748, "cid": "9e2db5c8", "stepIdx": null, "inv": null, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PreInvocation", "t": 1791700189.6879973, "cid": "9e2db5c8", "stepIdx": null, "inv": 0, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PostInvocation", "t": 1791700192.3946433, "cid": "9e2db5c8", "stepIdx": null, "inv": 0, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "Stop", "t": 1791700192.5124674, "cid": "9e2db5c8", "stepIdx": null, "inv": null, "tool": null, "args": null, "fullyIdle": true, "reason": "NO_TOOL_CALL"}

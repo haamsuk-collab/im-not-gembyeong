@@ -1,0 +1,849 @@
+{
+  "scope": "ledger",
+  "atoms": [
+    {
+      "id": "LED-01",
+      "name": "Four-file state layout under .harness",
+      "statement": "Ledger state MUST live in exactly four fixed files with one role each: append-only data (ledger.jsonl), anchor (ledger.head.json), intent journal (ledger.pending.json) and lock (ledger.lock).",
+      "mechanism": "Ledger.__init__ resolves the root once and fixes the four paths under <root>/.harness; each file has its own validator and error-code family (ledger_*, ledger_head_*, ledger_pending_*, ledger_lock_*).",
+      "threat": "principle",
+      "refs": ["src/codex_harness/ledger.py:185-199"],
+      "tests": ["tests/test_ledger_v2.py::test_ledger_head_pending_and_lock_modes_are_private"],
+      "coupling": "host-neutral",
+      "loc": 15,
+      "g1_hint": "modify: keep the four-role split but place it in a G1-private directory outside the agent-writable workspace, keyed by repository identity."
+    },
+    {
+      "id": "LED-02",
+      "name": "Exact-field v2 record envelope",
+      "statement": "Every ledger line MUST be a JSON object with exactly the nine envelope fields schema_version, ledger_id, seq, prev_record_hash, event_type, task_id, timestamp, payload, record_hash, each type-checked, else fail closed.",
+      "mechanism": "_RECORD_FIELDS set equality then ordered checks in _validate_record: exact-int schema_version == 2, uuid4 ledger_id, ranged seq, hex prev hash, known event, nullable task_id, ms timestamp, dict payload, hex record_hash, each with a typed code.",
+      "threat": "Smuggled extra fields, missing fields or type-confused values silently changing a receipt's meaning.",
+      "refs": ["src/codex_harness/ledger.py:69-79", "src/codex_harness/ledger.py:1149-1240"],
+      "tests": ["tests/test_ledger_canonicality.py::test_record_and_head_exact_fields_and_event_allowlist", "tests/test_ledger.py::test_partial_record_is_rejected"],
+      "coupling": "host-neutral",
+      "loc": 103,
+      "g1_hint": "keep: a closed envelope makes every receipt mechanically checkable without trusting the writer's intent."
+    },
+    {
+      "id": "LED-03",
+      "name": "Byte-canonical line encoding",
+      "statement": "The stored bytes of every record, head and journal MUST equal canonical_json(value) plus one LF exactly (sorted keys, no whitespace, raw UTF-8), so each value has exactly one encoding.",
+      "mechanism": "_require_canonical_bytes re-serialises the parsed value with util.canonical_json (sort_keys, separators , and :, ensure_ascii False, allow_nan False) and compares bytes, reporting the first differing offset as ledger_json_noncanonical.",
+      "threat": "Encoding malleability (whitespace, key order, unicode escapes, 1e0 vs 1.0, CRLF, missing final LF) hiding edits or giving one record several byte forms.",
+      "refs": ["src/codex_harness/ledger.py:643-672", "src/codex_harness/ledger.py:1537-1539", "src/codex_harness/util.py:32-39"],
+      "tests": ["tests/test_ledger_canonicality.py::test_strict_json_and_line_representation_rejected_unchanged", "tests/test_ledger_canonicality.py::test_invalid_utf8_duplicate_nested_and_alternate_order", "tests/test_ledger_canonicality.py::test_noncanonical_number_form_is_rejected", "tests/test_ledger_v2.py::test_malformed_and_partial_last_lines_are_rejected"],
+      "coupling": "host-neutral",
+      "loc": 40,
+      "g1_hint": "modify: keep byte-canonicality but specify it as RFC 8785 JCS or an ASCII-key, integer-only subset, because Python key sort and float repr are not reproducible in a TS/Bun omp extension."
+    },
+    {
+      "id": "LED-04",
+      "name": "Strict JSON decoder rejects ambiguity",
+      "statement": "Decoding MUST reject a UTF-8 BOM, invalid UTF-8, duplicate object keys, NaN/Infinity, a non-object top level and parser recursion overflow, all with one typed code.",
+      "mechanism": "_decode_json_object runs json.loads with object_pairs_hook=_reject_duplicate_keys, parse_constant=_reject_nonfinite and parse_int=_parse_integer after a BOM check and strict UTF-8 decode, mapping every failure (including RecursionError) to ledger_json_invalid.",
+      "threat": "Parser differentials (duplicate-key last-wins vs first-wins) letting two readers see different receipts; NaN/Infinity breaking comparisons.",
+      "refs": ["src/codex_harness/ledger.py:147-179", "src/codex_harness/ledger.py:616-640"],
+      "tests": ["tests/test_ledger_canonicality.py::test_strict_json_and_line_representation_rejected_unchanged", "tests/test_ledger_canonicality.py::test_invalid_utf8_duplicate_nested_and_alternate_order", "tests/test_ledger_v2.py::test_missing_corrupt_or_symlink_head_blocks"],
+      "coupling": "host-neutral",
+      "loc": 45,
+      "g1_hint": "modify: JS JSON.parse silently keeps the last duplicate key and loses big integers, so G1 needs a strict parser or pre-scan to keep this guarantee."
+    },
+    {
+      "id": "LED-05",
+      "name": "Exact ranged integers only",
+      "statement": "Integer fields MUST be exact integers (never bool, float or string) within +/-(2^63-1), and integer literals longer than 19 digits are rejected before conversion.",
+      "mechanism": "_parse_integer checks digit length and range during parsing; _validate_json_value and every field check use type(x) is int, so True, 1.0 and '1' fail for seq, schema_version, offsets, sizes and bindings.",
+      "threat": "Type confusion (True == 1, 1.0 == 1) forging sequence, offset or binding values; CPU exhaustion from huge integer literals.",
+      "refs": ["src/codex_harness/ledger.py:36", "src/codex_harness/ledger.py:172-179", "src/codex_harness/ledger.py:584-587", "src/codex_harness/ledger.py:1180-1185"],
+      "tests": ["tests/test_ledger_canonicality.py::test_record_integer_fields_are_exact", "tests/test_ledger_canonicality.py::test_head_offset_integer_is_exact", "tests/test_ledger_canonicality.py::test_completion_receipt_sequence_is_exact", "tests/test_ledger_canonicality.py::test_pending_sequence_integer_is_exact"],
+      "coupling": "host-neutral",
+      "loc": 20,
+      "g1_hint": "modify: keep the no-bool/no-float rule but cap at 2^53-1 (Number.MAX_SAFE_INTEGER) or parse as BigInt in TypeScript."
+    },
+    {
+      "id": "LED-06",
+      "name": "Whitelisted JSON values with depth cap",
+      "statement": "Every value read or written MUST be null, bool, int, finite float, surrogate-free string, list or string-keyed dict, nested at most 64 deep, with no cycles or shared sub-objects.",
+      "mechanism": "Iterative stack walk in _validate_json_value (exact type checks, depth counter, seen-id set), applied after decoding and to writer payloads before hashing.",
+      "threat": "Unencodable values (lone surrogates) crashing hashing, non-string keys silently coerced, deep-nesting DoS, cyclic payloads.",
+      "refs": ["src/codex_harness/ledger.py:37", "src/codex_harness/ledger.py:575-613", "src/codex_harness/ledger.py:2055-2060"],
+      "tests": ["tests/test_ledger_canonicality.py::test_strict_json_and_line_representation_rejected_unchanged"],
+      "coupling": "host-neutral",
+      "loc": 45,
+      "g1_hint": "modify: keep the closed value model but drop floats entirely; G1 receipts need only integers, strings, booleans and hex digests."
+    },
+    {
+      "id": "LED-07",
+      "name": "64 KiB record cap before parse/write",
+      "statement": "A record line including its LF MUST NOT exceed 65,536 bytes; oversize lines are rejected before parsing on read and before the journal is written on append.",
+      "mechanism": "MAX_LEDGER_RECORD_BYTES; readers call readline(MAX+1) and _parse_line checks length before decoding; _append_locked checks len(line) before any durable write; the backward tail scan is bounded to MAX+1.",
+      "threat": "Memory/CPU exhaustion from huge lines; unbounded journals; oversize records half-written.",
+      "refs": ["src/codex_harness/ledger.py:38", "src/codex_harness/ledger.py:1509-1518", "src/codex_harness/ledger.py:1576", "src/codex_harness/ledger.py:2118-2122"],
+      "tests": ["tests/test_ledger_canonicality.py::test_exact_record_limit_and_plus_one_before_pending", "tests/test_ledger_canonicality.py::test_oversized_head_and_long_lines_are_typed"],
+      "coupling": "host-neutral",
+      "loc": 15,
+      "g1_hint": "keep: bounded records keep verification cost predictable; store large evidence (stdout, manifests) out of line by digest."
+    },
+    {
+      "id": "LED-08",
+      "name": "Exact derived head and journal size bounds",
+      "statement": "Head and journal files MUST be size-checked against exact maxima derived from maximal-value templates (274 B head, 88,364 B journal) before they are read.",
+      "mechanism": "MAX_HEAD_BYTES and MAX_PENDING_BYTES are computed at import from canonical JSON of maximal field values plus base64 of a maximal record; _read_descriptor rejects st_size over the limit and any over-read.",
+      "threat": "Oversized or garbage control files causing memory blowup or slow parsing before validation runs.",
+      "refs": ["src/codex_harness/ledger.py:117-144", "src/codex_harness/ledger.py:509-548", "src/codex_harness/ledger.py:1296-1301", "src/codex_harness/ledger.py:2243-2248"],
+      "tests": ["tests/test_ledger_canonicality.py::test_exact_pending_limit_plus_one_and_padding_boundaries", "tests/test_ledger_canonicality.py::test_oversized_head_and_long_lines_are_typed"],
+      "coupling": "host-neutral",
+      "loc": 50,
+      "g1_hint": "keep: deriving limits from the schema is exact and self-maintaining."
+    },
+    {
+      "id": "LED-09",
+      "name": "Strict identifier and format validators",
+      "statement": "Identifiers MUST use one exact lowercase spelling: canonical uuid4, 64-hex SHA-256, calendar-valid YYYY-MM-DDTHH:MM:SS.mmmZ, task id [a-z0-9][a-z0-9._-]{0,63}, attempt id v-<32 hex>, git object id of 40-64 hex.",
+      "mechanism": "_valid_uuid (string round-trip equality, version 4, RFC 4122 variant), _valid_hash, _valid_timestamp (regex plus strptime), _valid_task_id and the module-level patterns.",
+      "threat": "Aliased identifiers (uppercase hex, braced uuids, impossible dates) defeating equality-based binding checks.",
+      "refs": ["src/codex_harness/ledger.py:39-44", "src/codex_harness/ledger.py:674-708"],
+      "tests": ["tests/test_ledger_canonicality.py::test_record_and_head_exact_fields_and_event_allowlist", "tests/test_ledger_v2.py::test_head_ledger_id_mismatch_is_rejected"],
+      "coupling": "host-neutral",
+      "loc": 45,
+      "g1_hint": "keep: single canonical spellings make plain string equality a sound binding check."
+    },
+    {
+      "id": "LED-10",
+      "name": "Domain-separated framed record hash",
+      "statement": "record_hash MUST be SHA-256 over a fixed domain tag, then NUL-framed ledger_id, seq and prev hash, then the canonical JSON of the record without record_hash.",
+      "mechanism": "compute_record_hash concatenates RECORD_HASH_DOMAIN (codex-root-harness-ledger-v2 plus NUL), ledger_id, NUL, seq, NUL, prev hash, NUL and canonical_json(material); _validate_record recomputes and compares.",
+      "threat": "Cross-context digest confusion (a record hash reused as a manifest or line digest), framing ambiguity, undetected field edits.",
+      "refs": ["src/codex_harness/ledger.py:34", "src/codex_harness/ledger.py:1130-1146", "src/codex_harness/ledger.py:1231-1240"],
+      "tests": ["tests/test_ledger_v2.py::test_record_hash_mismatch_is_rejected", "tests/test_ledger_v2.py::test_record_hash_is_independent_of_dict_insertion_order"],
+      "coupling": "host-neutral",
+      "loc": 25,
+      "g1_hint": "modify: keep framing and domain separation with a G1 tag, and consider an HMAC keyed outside the agent's reach to add authenticity."
+    },
+    {
+      "id": "LED-11",
+      "name": "Contiguous sequence hash chain from genesis",
+      "statement": "Record n MUST have seq == n and prev_record_hash equal to record n-1's hash (64 zeros for n = 1); any gap, duplicate, reorder or relink fails closed.",
+      "mechanism": "_validate_stream feeds expected_seq = line number and expected_previous = prior record_hash into _validate_record, which raises ledger_sequence_mismatch or ledger_previous_hash_mismatch.",
+      "threat": "Insertion, deletion, duplication or reordering of receipts inside history.",
+      "refs": ["src/codex_harness/ledger.py:33", "src/codex_harness/ledger.py:1180-1199", "src/codex_harness/ledger.py:1567-1591"],
+      "tests": ["tests/test_ledger_v2.py::test_sequence_duplicate_gap_and_reorder_fail_closed", "tests/test_ledger_v2.py::test_previous_hash_mismatch_is_rejected"],
+      "coupling": "host-neutral",
+      "loc": 40,
+      "g1_hint": "keep: the chain is the core tamper-evidence primitive for harness-observed events."
+    },
+    {
+      "id": "LED-12",
+      "name": "Random per-ledger identity in every record",
+      "statement": "Each ledger MUST carry a random uuid4 ledger_id fixed at genesis that appears in the head, every record, the journal and the hash framing, and must match everywhere.",
+      "mechanism": "_bootstrap_locked mints the uuid4; _validate_record compares it to the head (ledger_id_mismatch); _load_pending cross-checks journal, old head and new head.",
+      "threat": "Splicing records or heads from another ledger (cross-repository replay of a valid completion).",
+      "refs": ["src/codex_harness/ledger.py:1173-1179", "src/codex_harness/ledger.py:1779-1784", "src/codex_harness/ledger.py:2287-2298"],
+      "tests": ["tests/test_ledger_v2.py::test_cross_ledger_anchor_is_rejected", "tests/test_ledger_v2.py::test_head_ledger_id_mismatch_is_rejected"],
+      "coupling": "host-neutral",
+      "loc": 15,
+      "g1_hint": "keep: cheap anti-splice binding, but it is public, so it adds no authenticity."
+    },
+    {
+      "id": "LED-13",
+      "name": "Head anchor binds count, tail hash, length",
+      "statement": "A separate head file MUST record last_seq, last_record_hash and last_record_end_offset, and verification fails unless file size, record count, tail hash and parsed length all equal it.",
+      "mechanism": "_validate_stream compares fstat size with the anchored offset (ledger_tail_truncated if shorter, ledger_unanchored_tail if longer), then count, tail hash and summed line lengths (ledger_anchor_mismatch).",
+      "threat": "Silent tail truncation (deleting an invalidation or failed receipt), unanchored appended lines (echo >> ledger), prefix replacement, head-only rollback.",
+      "refs": ["src/codex_harness/ledger.py:80-87", "src/codex_harness/ledger.py:1542-1621"],
+      "tests": ["tests/test_ledger_v2.py::test_tail_invalidation_deletion_never_revives_completion", "tests/test_ledger_v2.py::test_deleting_last_success_receipt_is_detected", "tests/test_ledger_v2.py::test_replacing_ledger_with_an_older_valid_prefix_is_detected", "tests/test_ledger_v2.py::test_rolling_back_only_anchor_is_detected", "tests/test_ledger_v2.py::test_unanchored_valid_looking_line_is_detected"],
+      "coupling": "host-neutral",
+      "loc": 50,
+      "g1_hint": "modify: keep the anchor but also hold its (seq, hash) in extension memory and a G1-private store so a consistent ledger+head rollback is caught."
+    },
+    {
+      "id": "LED-14",
+      "name": "Head schema with genesis consistency",
+      "statement": "The head MUST be canonical, size-bounded and exact-field, with last_seq 0 iff the hash is 64 zeros and the offset is 0, and a nonzero seq implying a nonzero hash and offset.",
+      "mechanism": "_validate_head (field set, schema 2, uuid4, ranged ints, hex hash, timestamp, genesis rules) and _load_head (missing gives ledger_head_missing, bounded read, strict decode, canonical check).",
+      "threat": "Malformed or forged heads claiming emptiness for a non-empty ledger or the reverse.",
+      "refs": ["src/codex_harness/ledger.py:1243-1305"],
+      "tests": ["tests/test_ledger_canonicality.py::test_head_offset_integer_is_exact", "tests/test_ledger_canonicality.py::test_record_and_head_exact_fields_and_event_allowlist", "tests/test_ledger_v2.py::test_missing_corrupt_or_symlink_head_blocks"],
+      "coupling": "host-neutral",
+      "loc": 63,
+      "g1_hint": "keep: a small, fully specified control record."
+    },
+    {
+      "id": "LED-15",
+      "name": "O(1) first-line and tail check on append",
+      "statement": "Before appending, the writer MUST confirm file size equals the anchor, line 1 is a valid genesis-linked v2 record, and the tail record is valid, canonical and equal to the head hash.",
+      "mechanism": "_require_v2_schema validates line 1; _tail_record reads backward in 4 KiB windows doubling to MAX+1 to isolate the last line and validates it against the head; middle records are not re-read.",
+      "threat": "Extending a ledger whose tail or anchor has been tampered with or torn.",
+      "refs": ["src/codex_harness/ledger.py:1623-1665", "src/codex_harness/ledger.py:1788-1878"],
+      "tests": ["tests/test_ledger_v2.py::test_append_does_not_call_full_read", "tests/test_ledger_v2.py::test_append_existing_record_work_is_constant", "tests/test_ledger_canonicality.py::test_ordinary_append_metrics_remain_tail_only"],
+      "coupling": "host-neutral",
+      "loc": 130,
+      "g1_hint": "keep: O(1) appends suit per-tool-call receipts, provided a full verify runs at every trust decision because middle corruption is invisible to append."
+    },
+    {
+      "id": "LED-16",
+      "name": "Write-ahead intent journal",
+      "statement": "Before touching the ledger, the writer MUST durably write a journal holding old head, new head, intended seq and hash, and the exact line bytes as base64 plus their SHA-256.",
+      "mechanism": "_append_locked builds the pending dict and writes ledger.pending.json via _atomic_write_json (temp, fsync, rename, directory fsync) before opening the ledger for append.",
+      "threat": "A crash leaving bytes beyond the anchor that cannot be told apart from tampering.",
+      "refs": ["src/codex_harness/ledger.py:88-100", "src/codex_harness/ledger.py:2130-2146"],
+      "tests": ["tests/test_ledger_v2.py::test_crash_after_pending_before_append_aborts_safely", "tests/test_ledger_v2.py::test_ledger_head_pending_and_lock_modes_are_private"],
+      "coupling": "host-neutral",
+      "loc": 20,
+      "g1_hint": "keep: it makes every post-anchor byte explainable, which lets G1 treat unexplained bytes as tampering."
+    },
+    {
+      "id": "LED-17",
+      "name": "Strict durable commit order",
+      "statement": "An append MUST run journal durable, then O_APPEND write plus ledger fsync, then atomic head replace plus directory fsync, then journal unlink plus directory fsync, so the anchor never points past durable data.",
+      "mechanism": "Sequential steps in _append_locked with fault points between them; the ledger is opened O_APPEND|O_WRONLY (stable inode) and the head is atomically replaced on every append.",
+      "threat": "An anchor referencing data lost on power failure; torn appends.",
+      "refs": ["src/codex_harness/ledger.py:2143-2175"],
+      "tests": ["tests/test_ledger_v2.py::test_crash_before_pending_leaves_no_ambiguous_record", "tests/test_ledger_v2.py::test_crash_after_ledger_or_head_recovers_exact_append", "tests/test_ledger_canonicality.py::test_status_crash_boundaries_converge_without_duplicate"],
+      "coupling": "posix",
+      "loc": 35,
+      "g1_hint": "keep: standard WAL ordering; Bun/Node fsyncSync and renameSync give the same guarantees on Linux."
+    },
+    {
+      "id": "LED-18",
+      "name": "Recovery infers phase from durable state",
+      "statement": "Recovery MUST classify a journaled append only by exact comparison of current head and ledger bytes with the journal (aborted, committed, finalized); every other state is blocked.",
+      "mechanism": "_recover_pending_locked: head == old and size == old offset removes the journal (append_aborted); head == old, size == new offset and tail bytes == line writes the new head (append_committed); head == new and size == new offset removes the journal (append_finalized); head equality includes updated_at; the journal phase field is always 'prepared'.",
+      "threat": "Guessing the recovery direction from partial evidence and committing a forged or partial record.",
+      "refs": ["src/codex_harness/ledger.py:2360-2414"],
+      "tests": ["tests/test_ledger_v2.py::test_crash_after_pending_before_append_aborts_safely", "tests/test_ledger_v2.py::test_crash_after_ledger_or_head_recovers_exact_append", "tests/test_ledger_canonicality.py::test_current_event_pending_recovery_semantics_are_unchanged"],
+      "coupling": "host-neutral",
+      "loc": 55,
+      "g1_hint": "keep: state-derived recovery is simpler and more robust than recording phases."
+    },
+    {
+      "id": "LED-19",
+      "name": "Exact-match recovery, never truncate or rebuild",
+      "statement": "Recovery MUST NOT truncate, rewrite or reconstruct the ledger; torn records, mismatched bytes or an unknown head block with ledger_recovery_blocked, and the full chain is re-validated before the journal is resolved.",
+      "mechanism": "No truncate or O_TRUNC exists in ledger.py; a size between old and new offsets raises; _validate_payload_against_head re-validates every record and offset before the head is written or the journal removed.",
+      "threat": "Recovery used as a laundering path to rewrite history; data loss from automatic repair.",
+      "refs": ["src/codex_harness/ledger.py:2206-2240", "src/codex_harness/ledger.py:2377-2397", "src/codex_harness/ledger.py:2411-2414"],
+      "tests": ["tests/test_ledger_v2.py::test_partial_pending_line_requires_manual_inspection", "tests/test_ledger_v2.py::test_corrupt_stale_and_old_head_mismatched_pending_are_blocked"],
+      "coupling": "host-neutral",
+      "loc": 50,
+      "g1_hint": "keep: fail closed over repair; truncating a torn tail that is a byte-exact prefix of the journaled line is a provably safe experiment."
+    },
+    {
+      "id": "LED-20",
+      "name": "Pending journal blocks reads and appends",
+      "statement": "While a journal exists, every read and append MUST fail with ledger_pending_recovery until an explicit recover() resolves it.",
+      "mechanism": "_read_locked and _append_locked check for ledger.pending.json; status() reports append_recovery_required; only recover() under the exclusive lock acts on it.",
+      "threat": "Consumers trusting a ledger that is mid-transaction and ambiguous.",
+      "refs": ["src/codex_harness/ledger.py:1684-1688", "src/codex_harness/ledger.py:2064-2068", "src/codex_harness/ledger.py:2416-2426", "src/codex_harness/ledger.py:2449-2454"],
+      "tests": ["tests/test_ledger_v2.py::test_crash_after_pending_before_append_aborts_safely", "tests/test_ledger_v2.py::test_disk_full_and_fsync_failures_leave_recoverable_or_blocked_state"],
+      "coupling": "host-neutral",
+      "loc": 25,
+      "g1_hint": "modify: because recovery is exact-match only, the G1 extension can run it automatically at session start instead of waiting for an operator."
+    },
+    {
+      "id": "LED-21",
+      "name": "Journal self-consistency validation",
+      "statement": "A journal MUST be exact-field, canonical and size-bounded, internally consistent (ids, seq+1, hashes, offsets), carry strictly canonical base64 whose decoded line matches its digest and links to the old head, and hold a current-schema event.",
+      "mechanism": "_load_pending: field and type checks, _validate_head on both heads, base64 validate=True with re-encode equality, decoded length <= MAX, SHA-256 equality, _validated_record_line against the old head, current-event check, offset arithmetic.",
+      "threat": "A crafted journal used to inject a record (including a retired event) through recover().",
+      "refs": ["src/codex_harness/ledger.py:2242-2358"],
+      "tests": ["tests/test_ledger_canonicality.py::test_pending_schema_base64_decoded_size_and_record_canonicality", "tests/test_ledger_canonicality.py::test_noncurrent_pending_event_is_typed_corrupt_and_zero_write", "tests/test_ledger_canonicality.py::test_pending_sequence_integer_is_exact", "tests/test_ledger_canonicality.py::test_exact_pending_limit_plus_one_and_padding_boundaries"],
+      "coupling": "host-neutral",
+      "loc": 117,
+      "g1_hint": "keep: the journal is an injection surface and needs validation as strict as the ledger's."
+    },
+    {
+      "id": "LED-22",
+      "name": "Post-durable failures typed as incomplete",
+      "statement": "Once the journal is durable, any typed failure MUST surface as ledger_transaction_incomplete, and post-commit success is reported only when the journal is verifiably gone.",
+      "mechanism": "A pending_durable flag wraps HarnessError into ledger_transaction_incomplete; a failed journal unlink re-raises unless the file is absent, in which case only cleanup_warning is set in last_append_metrics.",
+      "threat": "A caller believing an append failed cleanly (and retrying) or succeeded while state is ambiguous.",
+      "refs": ["src/codex_harness/ledger.py:2161-2194"],
+      "tests": ["tests/test_ledger_v2.py::test_disk_full_and_fsync_failures_leave_recoverable_or_blocked_state"],
+      "coupling": "host-neutral",
+      "loc": 25,
+      "g1_hint": "modify: keep the typing but surface cleanup warnings to the operator, which T1 silently drops."
+    },
+    {
+      "id": "LED-23",
+      "name": "Named crash-injection points",
+      "statement": "The append path SHOULD expose named fault points so every crash boundary can be exercised deterministically.",
+      "mechanism": "An optional fault_injector callback is invoked by _fault(phase) at before_pending, after_pending, after_ledger_fsync, after_head_replace and after_pending_remove.",
+      "threat": "principle",
+      "refs": ["src/codex_harness/ledger.py:185-203", "src/codex_harness/ledger.py:2143-2175"],
+      "tests": ["tests/test_ledger_v2.py::test_crash_before_pending_leaves_no_ambiguous_record", "tests/test_ledger_v2.py::test_crash_after_ledger_or_head_recovers_exact_append", "tests/test_ledger_canonicality.py::test_status_crash_boundaries_converge_without_duplicate"],
+      "coupling": "host-neutral",
+      "loc": 10,
+      "g1_hint": "keep: a cheap seam that turns crash-consistency claims into reproducible evidence."
+    },
+    {
+      "id": "LED-24",
+      "name": "Atomic replace with inode verification",
+      "statement": "Control files MUST be replaced by writing an O_EXCL temp file in the same directory, fsyncing it, renaming it, confirming the target now has the temp's inode, and fsyncing the directory.",
+      "mechanism": "_atomic_write_bytes: temp .<name>.<uuid>.tmp opened via _open_regular with O_CREAT|O_EXCL, _write_all, fsync, os.replace, reopen and compare (dev, ino) with the temp (ledger_race), _directory_fsync, unlink the temp on error.",
+      "threat": "Torn head or journal writes; a concurrent swap of the target between rename and use.",
+      "refs": ["src/codex_harness/ledger.py:422-486"],
+      "tests": ["tests/test_ledger_v2.py::test_crash_after_ledger_or_head_recovers_exact_append"],
+      "coupling": "posix",
+      "loc": 65,
+      "g1_hint": "keep: portable to Bun/Node (openSync 'wx', fsyncSync, renameSync, fstatSync with bigint ino)."
+    },
+    {
+      "id": "LED-25",
+      "name": "Directory fsync after namespace changes",
+      "statement": "After a create, rename or unlink in the ledger directory, the directory itself MUST be fsynced.",
+      "mechanism": "_directory_fsync opens .harness with O_RDONLY|O_DIRECTORY|O_NOFOLLOW and fsyncs it; called after genesis creation, every atomic replace and journal removal.",
+      "threat": "Renames or unlinks lost on power failure, reviving stale heads or journals.",
+      "refs": ["src/codex_harness/ledger.py:401-420", "src/codex_harness/ledger.py:469", "src/codex_harness/ledger.py:506", "src/codex_harness/ledger.py:1778"],
+      "tests": [],
+      "coupling": "posix",
+      "loc": 22,
+      "g1_hint": "keep: required for real durability on Linux; macOS needs F_FULLFSYNC for an equivalent guarantee."
+    },
+    {
+      "id": "LED-26",
+      "name": "Short writes retried, I/O failures typed",
+      "statement": "Writes MUST loop until every byte is written (zero progress is an error), and write and fsync failures MUST map to typed codes.",
+      "mechanism": "_write_all loops over a memoryview; _fsync wraps OSError with a code and label.",
+      "threat": "Silent partial writes; untyped crashes that leave operators guessing.",
+      "refs": ["src/codex_harness/ledger.py:378-399"],
+      "tests": ["tests/test_ledger_v2.py::test_short_writes_are_retried", "tests/test_ledger_v2.py::test_disk_full_and_fsync_failures_leave_recoverable_or_blocked_state"],
+      "coupling": "posix",
+      "loc": 20,
+      "g1_hint": "keep: trivial and necessary."
+    },
+    {
+      "id": "LED-27",
+      "name": "No-follow single-link regular-file opens",
+      "statement": "Every ledger, head, journal and lock open MUST refuse symlinks, hardlinked (nlink != 1) or non-regular files and detect path/inode swaps around the open; without O_NOFOLLOW the ledger refuses to operate.",
+      "mechanism": "_open_regular: lstat before (_inspect_existing), open with O_NOFOLLOW|O_CLOEXEC|O_NONBLOCK mode 0600, ELOOP/EMLINK mapped to *_symlink, fstat regular with nlink 1, lstat after, (dev, ino) equality before and after (ledger_race), ledger_hardening_unavailable when O_NOFOLLOW is missing.",
+      "threat": "Symlink redirection to files outside the repo, hardlink aliasing so edits elsewhere change the ledger, a planted FIFO hanging opens, swap races.",
+      "refs": ["src/codex_harness/ledger.py:269-376"],
+      "tests": ["tests/test_ledger_v2.py::test_head_and_pending_symlinks_are_rejected", "tests/test_ledger_v2.py::test_ledger_metadata_hardlinks_are_rejected", "tests/test_ledger_v2.py::test_missing_corrupt_or_symlink_head_blocks", "tests/test_security_core.py::test_ledger_and_lock_symlinks_are_rejected"],
+      "coupling": "posix",
+      "loc": 110,
+      "g1_hint": "modify: keep the nofollow, nlink and inode checks (Node exposes O_NOFOLLOW and fstat ino/nlink) but re-verify the directory inode after each operation, since Node has no openat."
+    },
+    {
+      "id": "LED-28",
+      "name": "Private modes enforced on write paths",
+      "statement": "Ledger files MUST be mode 0600 and the ledger directory 0700, enforced on every write-path open.",
+      "mechanism": "_open_regular fchmods 0600 for non-read-only opens; _secure_parent calls util.ensure_secure_directory (mode 0700, boundary = root, symlinked components rejected); read paths verify neither mode nor owner.",
+      "threat": "Other local users reading or modifying receipts.",
+      "refs": ["src/codex_harness/ledger.py:205-217", "src/codex_harness/ledger.py:366-367", "src/codex_harness/util.py:182-248"],
+      "tests": ["tests/test_ledger_v2.py::test_ledger_head_pending_and_lock_modes_are_private"],
+      "coupling": "posix",
+      "loc": 30,
+      "g1_hint": "modify: also verify mode and st_uid on read; against a same-user agent modes add nothing, so pair them with state stored outside the workspace."
+    },
+    {
+      "id": "LED-29",
+      "name": "Zero-write read paths",
+      "statement": "read(), verify() and status() MUST NOT create, chmod or modify any file, including the lock file and the directory.",
+      "mechanism": "_validate_parent_readonly does lstat plus an O_DIRECTORY|O_NOFOLLOW open with inode comparison and never mkdirs or chmods; the lock is opened O_RDONLY only if it exists; a pristine root returns uninitialized without genesis.",
+      "threat": "Observers mutating evidence, e.g. creating files that change later pristine-state proofs.",
+      "refs": ["src/codex_harness/ledger.py:219-267", "src/codex_harness/ledger.py:1699-1741"],
+      "tests": ["tests/test_ledger_canonicality.py::test_pristine_read_only_surfaces_remain_uninitialized"],
+      "coupling": "posix",
+      "loc": 55,
+      "g1_hint": "keep: in an evidence-only harness, observation must never perturb the observed state."
+    },
+    {
+      "id": "LED-30",
+      "name": "Exclusive flock serializes all mutations",
+      "statement": "Every mutation (append, genesis, recover, and caller read-validate-append sequences) MUST hold an exclusive flock on a never-unlinked lock file for the whole operation, fsyncs included.",
+      "mechanism": "_exclusive_lock context manager: _secure_parent, _open_lock (O_CREAT|O_RDWR, 0600), fcntl.flock LOCK_EX, yields lock timing, then unlocks and closes; nothing ever deletes ledger.lock.",
+      "threat": "Concurrent writers interleaving lines or racing sequence numbers.",
+      "refs": ["src/codex_harness/ledger.py:1411-1432", "src/codex_harness/ledger.py:1459-1474"],
+      "tests": ["tests/test_ledger.py::test_concurrent_append_is_locked_and_complete"],
+      "coupling": "posix",
+      "loc": 35,
+      "g1_hint": "modify: Bun/Node core has no flock, so use an in-process async mutex (single G1 writer) plus an O_EXCL lockfile or FFI flock across omp instances, with a timeout."
+    },
+    {
+      "id": "LED-31",
+      "name": "Shared-lock reads, guarded lockless fallback",
+      "statement": "Readers MUST take a shared flock when the lock file exists; if it does not, they read unlocked and fail with ledger_race if the lock appeared meanwhile.",
+      "mechanism": "_read_with_shared_lock checks lock presence, opens it O_RDONLY with LOCK_SH, or reads and then re-inspects the lock path.",
+      "threat": "Reading a half-applied append; read paths creating lock files.",
+      "refs": ["src/codex_harness/ledger.py:1434-1457"],
+      "tests": ["tests/test_ledger_canonicality.py::test_pristine_read_only_surfaces_remain_uninitialized"],
+      "coupling": "posix",
+      "loc": 24,
+      "g1_hint": "modify: with a single in-process writer G1 can serialize reads behind the writer's mutex; keep the 'lock appeared' post-check for out-of-process readers."
+    },
+    {
+      "id": "LED-32",
+      "name": "Check-then-append in one critical section",
+      "statement": "Lifecycle decisions (status, completion, contract update) MUST read, validate and append under the same exclusive lock so no event can intervene.",
+      "mechanism": "_append_locked requires the caller to hold _exclusive_lock; plan.py and cli.py call _read_locked and pass locked_receipts; _append_locked re-reads only when receipts are not supplied.",
+      "threat": "TOCTOU: a verification start or invalidation landing between completion evaluation and the complete append.",
+      "refs": ["src/codex_harness/ledger.py:2012-2023", "src/codex_harness/ledger.py:2069-2091", "src/codex_harness/plan.py:559-561", "src/codex_harness/cli.py:343-377"],
+      "tests": ["tests/test_completion_boundary_remediation.py::test_verification_started_first_makes_paused_completion_stale_and_zero_write", "tests/test_completion_boundary_remediation.py::test_verify_that_passed_plan_guard_is_refused_before_evidence_overwrite"],
+      "coupling": "host-neutral",
+      "loc": 30,
+      "g1_hint": "modify: keep the single critical section but have the ledger cross-check supplied receipts against the head (count and tail hash) instead of trusting the caller."
+    },
+    {
+      "id": "LED-33",
+      "name": "Writer allowlist of seven current events",
+      "statement": "Only the seven current events may be appended, checked before the lock is taken and again inside it.",
+      "mechanism": "_CURRENT_EVENT_TYPES (contract_registered, contract_update_accepted, task_status_changed, task_invalidated, verification_started, verification_succeeded, verification_failed) is enforced in append and _append_locked with ledger_event_unknown.",
+      "threat": "Writing retired or invented event types that consumers might misinterpret.",
+      "refs": ["src/codex_harness/ledger.py:46-56", "src/codex_harness/ledger.py:2024-2029", "src/codex_harness/ledger.py:2196-2204"],
+      "tests": ["tests/test_ledger_canonicality.py::test_historical_retired_event_is_readable_inert_and_not_writable"],
+      "coupling": "host-neutral",
+      "loc": 20,
+      "g1_hint": "keep: a closed writer vocabulary; G1's events would be harness observations such as command_run, file_hashed, tool_call_recorded."
+    },
+    {
+      "id": "LED-34",
+      "name": "Legacy events readable-inert, unknown rejected",
+      "statement": "Six retired event types MUST stay readable with unvalidated payloads (apart from reserved keys) and never be written or recovered; any other event type fails read with ledger_event_unknown.",
+      "mechanism": "_LEGACY_EVENT_TYPES short-circuits _validate_event_payload; _KNOWN_EVENT_TYPES is checked in _validate_record; _load_pending maps unknown or legacy journal events to ledger_pending_corrupt.",
+      "threat": "Retired semantics re-entering the live ledger; unknown future events silently accepted.",
+      "refs": ["src/codex_harness/ledger.py:57-67", "src/codex_harness/ledger.py:816-826", "src/codex_harness/ledger.py:1205-1209", "src/codex_harness/ledger.py:2333-2349"],
+      "tests": ["tests/test_ledger_canonicality.py::test_record_and_head_exact_fields_and_event_allowlist", "tests/test_ledger_canonicality.py::test_historical_retired_event_is_readable_inert_and_not_writable", "tests/test_ledger_canonicality.py::test_noncurrent_pending_event_is_typed_corrupt_and_zero_write"],
+      "coupling": "codex",
+      "loc": 25,
+      "g1_hint": "drop: a fresh G1 ledger has no history; keep only the unknown-event rejection."
+    },
+    {
+      "id": "LED-35",
+      "name": "Payload cannot shadow envelope fields",
+      "statement": "Payload keys MUST NOT reuse envelope or decoded alias names, and callers MUST NOT supply ledger-minted fields, so flattened receipts cannot be spoofed.",
+      "mechanism": "Reader: _DECODE_RESERVED_PAYLOAD_FIELDS gives ledger_schema_invalid; writer: a reserved set (including receipt_id) gives invalid_receipt; task_id is popped from fields into the envelope.",
+      "threat": "A payload carrying its own seq, record_hash or event that overrides the real values in the flattened view.",
+      "refs": ["src/codex_harness/ledger.py:101-115", "src/codex_harness/ledger.py:816-819", "src/codex_harness/ledger.py:2031-2052"],
+      "tests": [],
+      "coupling": "host-neutral",
+      "loc": 35,
+      "g1_hint": "keep: required whenever envelope and payload are merged; never flattening is simpler still."
+    },
+    {
+      "id": "LED-36",
+      "name": "Current events bind task, contract, receipt id",
+      "statement": "Every current-event record MUST target a valid task_id and carry a ledger-minted uuid4 receipt_id and a 64-hex contract_hash.",
+      "mechanism": "Common checks at the top of _validate_event_payload; _append_locked mints receipt_id with uuid4 and forbids caller-supplied values.",
+      "threat": "Receipts not attributable to a task contract.",
+      "refs": ["src/codex_harness/ledger.py:827-840", "src/codex_harness/ledger.py:2054"],
+      "tests": ["tests/test_ledger_canonicality.py::test_record_and_head_exact_fields_and_event_allowlist"],
+      "coupling": "host-neutral",
+      "loc": 15,
+      "g1_hint": "modify: keep the task+contract binding but drop receipt_id, which nothing consumes because seq and record_hash already identify a receipt."
+    },
+    {
+      "id": "LED-37",
+      "name": "Exact per-event payload field sets",
+      "statement": "Each current event's payload keys MUST lie between its required and allowed sets, with optional groups present all-or-none.",
+      "mechanism": "_require_payload_fields checks set differences both ways; pair/triple checks cover bootstrap+allowed_paths, stdout+stderr digests, the oracle triple and the completion seq+hash.",
+      "threat": "Partial bindings (a seq without its hash) or stray fields altering meaning.",
+      "refs": ["src/codex_harness/ledger.py:716-729", "src/codex_harness/ledger.py:783-804", "src/codex_harness/ledger.py:851-856", "src/codex_harness/ledger.py:1053-1057"],
+      "tests": ["tests/test_completion_boundary.py::test_direct_unbound_and_partial_completion_appends_are_rejected_without_write"],
+      "coupling": "host-neutral",
+      "loc": 50,
+      "g1_hint": "keep: closed per-event schemas, generated in G1 from one declarative table."
+    },
+    {
+      "id": "LED-38",
+      "name": "Contract registration and update payloads",
+      "statement": "contract_registered MAY carry bootstrap=true with a nonempty allowed_paths list (both or neither); contract_update_accepted MUST carry a valid old hash different from the new one and a nonempty reason.",
+      "mechanism": "The two contract branches of _validate_event_payload.",
+      "threat": "No-op or malformed contract updates; partial bootstrap scope declarations.",
+      "refs": ["src/codex_harness/ledger.py:842-890"],
+      "tests": ["tests/test_ledger_canonicality.py::test_first_explicit_task_begin_creates_genesis_and_registration", "tests/test_ledger_canonicality.py::test_exact_record_limit_and_plus_one_before_pending"],
+      "coupling": "host-neutral",
+      "loc": 49,
+      "g1_hint": "modify: also enforce at append that old_contract_hash equals the task's currently registered contract; T1 checks only shape."
+    },
+    {
+      "id": "LED-39",
+      "name": "Status enum and completion binding shape",
+      "statement": "task_status_changed status MUST be pending, active, complete or blocked, and the verification_receipt_seq/hash pair is allowed only for complete, with 1 <= seq < the record's own seq.",
+      "mechanism": "task_status_changed branch of _validate_event_payload, with record_seq passed down from _validate_record.",
+      "threat": "Forward or self references in completion bindings; bindings attached to non-complete states.",
+      "refs": ["src/codex_harness/ledger.py:892-933"],
+      "tests": ["tests/test_ledger_canonicality.py::test_completion_receipt_sequence_is_exact", "tests/test_completion_boundary.py::test_malformed_completion_binding_is_rejected"],
+      "coupling": "host-neutral",
+      "loc": 42,
+      "g1_hint": "keep: backward-only references keep the chain acyclic and checkable in one pass."
+    },
+    {
+      "id": "LED-40",
+      "name": "Bounded single-line invalidation reason",
+      "statement": "task_invalidated MUST carry a nonempty reason of at most 2048 UTF-8 bytes with no NUL, CR or LF.",
+      "mechanism": "task_invalidated branch of _validate_event_payload, mirrored by the CLI pre-check before any append.",
+      "threat": "Log or terminal injection via multi-line reasons; oversized free text.",
+      "refs": ["src/codex_harness/ledger.py:935-956", "src/codex_harness/cli.py:403-416"],
+      "tests": ["tests/test_core_isolation.py::test_task_invalidate_rejects_invalid_reason_without_append", "tests/test_ledger_v2.py::test_tail_invalidation_deletion_never_revives_completion"],
+      "coupling": "host-neutral",
+      "loc": 22,
+      "g1_hint": "keep: bound every free-text receipt field this way; T1 does not do so for contract-update reasons."
+    },
+    {
+      "id": "LED-41",
+      "name": "verification_started binds attempt and command",
+      "statement": "verification_started MUST carry attempt_id v-<32 hex>, a 64-hex public_command_digest and a nonempty workspace; a legacy {command, workspace} shape is also accepted.",
+      "mechanism": "Exact field-set match against the modern or legacy frozenset in _validate_event_payload.",
+      "threat": "Unattributable verification attempts; command substitution between start and result.",
+      "refs": ["src/codex_harness/ledger.py:958-985"],
+      "tests": ["tests/test_completion_boundary_remediation.py::test_verification_started_first_makes_paused_completion_stale_and_zero_write"],
+      "coupling": "host-neutral",
+      "loc": 28,
+      "g1_hint": "modify: keep attempt and digest binding, drop the legacy shape, and require every result to pair with a harness-recorded start."
+    },
+    {
+      "id": "LED-42",
+      "name": "verification_succeeded binds evidence snapshot",
+      "statement": "verification_succeeded MUST have exit_code 0 and bind attempt_id, command digest, manifest path, source digest, git tree id, artifact hashes and timestamp, with optional manifest_content_hash and a stdout/stderr digest pair.",
+      "mechanism": "Modern branch of _validate_event_payload (required/allowed sets, pattern checks, _validate_artifact_binding); a legacy {command, exit_code, failure null, manifest, timed_out false} shape and the retired oracle triple are also accepted.",
+      "threat": "Success receipts that do not pin what was verified: which tree, which artifacts, which output.",
+      "refs": ["src/codex_harness/ledger.py:987-1090"],
+      "tests": ["tests/test_ledger_canonicality.py::test_verify_binds_every_contract_artifact_and_not_an_existing_substitute"],
+      "coupling": "git",
+      "loc": 104,
+      "g1_hint": "modify: make every digest mandatory, drop the legacy and oracle shapes, and compute all digests inside the harness process only."
+    },
+    {
+      "id": "LED-43",
+      "name": "verification_failed requires typed failure",
+      "statement": "verification_failed MUST carry attempt_id, command digest, ranged exit_code, boolean timed_out, nullable manifest and a nonempty failure code.",
+      "mechanism": "Final branch of _validate_event_payload, with optional manifest_content_hash and oracle triple.",
+      "threat": "Failures recorded without a cause, making invalidation and staleness reasoning impossible.",
+      "refs": ["src/codex_harness/ledger.py:1092-1127"],
+      "tests": ["tests/test_ledger_canonicality.py::test_missing_contract_artifact_is_a_typed_verification_failure", "tests/test_completion_boundary.py::test_completion_binding_rejects_failed_receipt_and_noncomplete_needs_no_binding"],
+      "coupling": "host-neutral",
+      "loc": 36,
+      "g1_hint": "keep: negative evidence must be as well-typed as positive evidence."
+    },
+    {
+      "id": "LED-44",
+      "name": "Artifact binding schema",
+      "statement": "artifact_hashes MUST be a nonempty list of exact {path, type, size, sha256} entries with type file or directory, and directories carry a nonempty entries list of {path, size, sha256}.",
+      "mechanism": "_validate_artifact_binding checks exact key sets, nonempty path strings, ranged integer sizes and hex digests.",
+      "threat": "Completion evidence that does not bind artifact content.",
+      "refs": ["src/codex_harness/ledger.py:731-781"],
+      "tests": ["tests/test_ledger_canonicality.py::test_verify_binds_every_contract_artifact_and_not_an_existing_substitute"],
+      "coupling": "host-neutral",
+      "loc": 50,
+      "g1_hint": "modify: also require safe relative paths and sorted unique entries, and allow empty directories."
+    },
+    {
+      "id": "LED-45",
+      "name": "Completion requires explicit receipt binding",
+      "statement": "A new task_status_changed to complete MUST include both verification_receipt_seq (int >= 1) and a 64-hex verification_receipt_hash, plus a valid contract hash and task id.",
+      "mechanism": "_new_completion_binding runs before any read or write and raises completion_binding_required when both are absent and completion_binding_invalid when partial or malformed.",
+      "threat": "Completion claimed without pointing at concrete verification evidence.",
+      "refs": ["src/codex_harness/ledger.py:1904-1933", "src/codex_harness/ledger.py:2053"],
+      "tests": ["tests/test_completion_boundary.py::test_direct_unbound_and_partial_completion_appends_are_rejected_without_write", "tests/test_completion_boundary.py::test_malformed_completion_binding_is_rejected"],
+      "coupling": "host-neutral",
+      "loc": 30,
+      "g1_hint": "keep: the central evidence-only rule, under which 'done' must cite a harness-produced receipt by seq and hash."
+    },
+    {
+      "id": "LED-46",
+      "name": "Binding must hit same-task same-contract success",
+      "statement": "The bound receipt MUST exist at that seq with that record hash, be verification_succeeded with exit_code 0, and match the completion's task id and contract hash.",
+      "mechanism": "_validate_completion_binding indexes receipts[seq-1] and compares seq, record_hash, event, exit_code, task_id and contract_hash, else completion_binding_mismatch.",
+      "threat": "Borrowing another task's success, an older contract's success or a failed receipt to claim completion.",
+      "refs": ["src/codex_harness/ledger.py:1936-1954"],
+      "tests": ["tests/test_completion_boundary.py::test_completion_binding_must_reference_same_task_and_contract", "tests/test_completion_boundary.py::test_completion_binding_rejects_failed_receipt_and_noncomplete_needs_no_binding"],
+      "coupling": "host-neutral",
+      "loc": 20,
+      "g1_hint": "keep: and re-check the binding on every full verify in G1, not only at append."
+    },
+    {
+      "id": "LED-47",
+      "name": "Later task events make binding stale",
+      "statement": "A completion binding MUST be refused if any current-schema event for the same task appears after the bound receipt.",
+      "mechanism": "_validate_completion_binding scans receipts[seq:] for the task using a frontier set equal to the seven current events, else completion_binding_stale.",
+      "threat": "Completing on old evidence after a newer verification start or failure, an invalidation, a contract change or a status change.",
+      "refs": ["src/codex_harness/ledger.py:1955-1972"],
+      "tests": ["tests/test_completion_boundary_remediation.py::test_every_required_later_task_frontier_makes_completion_binding_stale", "tests/test_ledger_canonicality.py::test_reconciled_status_frontier_prevents_verification_reuse"],
+      "coupling": "host-neutral",
+      "loc": 18,
+      "g1_hint": "keep: 'latest evidence wins' is the freshness rule an evidence-only harness needs; derive the frontier set from the event table rather than duplicating it."
+    },
+    {
+      "id": "LED-48",
+      "name": "Completed tasks are terminal",
+      "statement": "Once a task has a complete transition, the ledger MUST refuse non-complete status changes and contract updates (task_reopen_refused) and new verification starts (verification_refused_complete_task).",
+      "mechanism": "_validate_terminal_mutation and _validate_verification_start scan the full receipt list under the lock; registration, success/failure results and invalidation are not refused.",
+      "threat": "Reopening or re-verifying a finished task to change its meaning after the fact.",
+      "refs": ["src/codex_harness/ledger.py:1974-2010", "src/codex_harness/ledger.py:2088-2091"],
+      "tests": ["tests/test_completion_boundary_remediation_2.py::test_raw_ledger_terminal_mutations_are_typed_and_zero_write", "tests/test_completion_boundary_remediation.py::test_verify_that_passed_plan_guard_is_refused_before_evidence_overwrite", "tests/test_ledger_canonicality.py::test_completed_verify_refusal_comes_from_authoritative_boundary"],
+      "coupling": "host-neutral",
+      "loc": 40,
+      "g1_hint": "modify: enforce terminality for every event type through an O(1) per-task state index instead of full scans."
+    },
+    {
+      "id": "LED-49",
+      "name": "Validate everything before first durable write",
+      "statement": "All checks (event allowlist, reserved fields, ids, binding, terminal state, record self-validation, size) MUST finish before the journal is written, so a rejected append changes no bytes.",
+      "mechanism": "Ordering inside _append_locked: every check precedes _atomic_write_json(pending); public append rejects bad events before even opening the lock.",
+      "threat": "Rejected requests leaving partial artifacts that later look like evidence or block recovery.",
+      "refs": ["src/codex_harness/ledger.py:2024-2144", "src/codex_harness/ledger.py:2196-2204"],
+      "tests": ["tests/test_ledger_canonicality.py::test_exact_record_limit_and_plus_one_before_pending", "tests/test_ledger_canonicality.py::test_historical_retired_event_is_readable_inert_and_not_writable", "tests/test_completion_boundary.py::test_direct_unbound_and_partial_completion_appends_are_rejected_without_write"],
+      "coupling": "host-neutral",
+      "loc": 100,
+      "g1_hint": "keep: zero-write rejection keeps the ledger a pure record of accepted harness observations."
+    },
+    {
+      "id": "LED-50",
+      "name": "Writer round-trips through reader validator",
+      "statement": "The writer MUST validate the record it built with the same validator and canonical-bytes check readers use before persisting it.",
+      "mechanism": "_append_locked calls _validate_record and _require_canonical_bytes on the freshly built record and line.",
+      "threat": "Writer/reader skew producing records that later make the whole ledger unreadable.",
+      "refs": ["src/codex_harness/ledger.py:2098-2117"],
+      "tests": ["tests/test_ledger_canonicality.py::test_exact_record_limit_and_plus_one_before_pending"],
+      "coupling": "host-neutral",
+      "loc": 20,
+      "g1_hint": "keep: one validator for both directions removes a whole class of self-inflicted corruption."
+    },
+    {
+      "id": "LED-51",
+      "name": "Genesis only from proven-pristine state",
+      "statement": "With ledger and head both absent, genesis is legitimate only if the plan has zero tasks and no contract markers and .harness holds only allowlisted entries (plan.md, empty lock, evidence/real-codex-smoke, empty private/runtime); otherwise fail with ledger_state_missing and never repair.",
+      "mechanism": "_pristine_uninitialized combines _valid_zero_task_plan (load_plan plus a markdown marker scan) with _has_durable_task_trace (_scan_directory allowlist).",
+      "threat": "Deleting both files to silently restart history and launder failed or invalidated work.",
+      "refs": ["src/codex_harness/ledger.py:1310-1394"],
+      "tests": ["tests/test_ledger_canonicality.py::test_both_missing_with_durable_trace_fails_closed_zero_repair", "tests/test_ledger_canonicality.py::test_lost_state_is_typed_across_every_surface_without_repair", "tests/test_ledger_canonicality.py::test_empty_lock_and_runtime_are_pristine"],
+      "coupling": "codex",
+      "loc": 85,
+      "g1_hint": "modify: keep 'missing state is never pristine unless proven', but prove it from G1's own external state registry instead of scanning T1's plan and Codex-specific directories."
+    },
+    {
+      "id": "LED-52",
+      "name": "Genesis only via explicit first-task begin",
+      "statement": "Only the explicit first-task path may create genesis, with allow_genesis decided under the exclusive lock; ordinary appends to an uninitialized ledger fail with ledger_uninitialized.",
+      "mechanism": "_bootstrap_locked(allow_genesis) creates an empty ledger (O_CREAT|O_EXCL, fsync, directory fsync) then a seq-0 head with a fresh uuid4; plan.begin_task is the only caller passing allow_genesis.",
+      "threat": "Accidental or attacker-triggered re-initialisation by any writer.",
+      "refs": ["src/codex_harness/ledger.py:1743-1786", "src/codex_harness/plan.py:559-561", "src/codex_harness/plan.py:623-634"],
+      "tests": ["tests/test_ledger_canonicality.py::test_first_explicit_task_begin_creates_genesis_and_registration"],
+      "coupling": "host-neutral",
+      "loc": 45,
+      "g1_hint": "modify: keep explicit genesis but journal it so ledger and head appear atomically, closing T1's crash window."
+    },
+    {
+      "id": "LED-53",
+      "name": "One-sided loss typed, never repaired",
+      "statement": "If exactly one of ledger or head is missing, every surface MUST report ledger_file_missing or ledger_head_missing, and no operation may recreate the missing counterpart.",
+      "mechanism": "Presence-pair checks in _read_locked, _bootstrap_locked and status(); recover() reaches _read_locked and raises.",
+      "threat": "Deleting the head to escape anchor checks, or deleting the ledger to have it rebuilt.",
+      "refs": ["src/codex_harness/ledger.py:1675-1683", "src/codex_harness/ledger.py:1744-1754", "src/codex_harness/ledger.py:2437-2448"],
+      "tests": ["tests/test_ledger_canonicality.py::test_one_missing_counterpart_is_exact_and_zero_write", "tests/test_ledger_v2.py::test_missing_corrupt_or_symlink_head_blocks"],
+      "coupling": "host-neutral",
+      "loc": 25,
+      "g1_hint": "keep: deletion must be as detectable as modification."
+    },
+    {
+      "id": "LED-54",
+      "name": "Schema version gate without migration",
+      "statement": "A ledger whose first record is not schema v2 MUST be reported ledger_schema_unsupported on read and append and never rewritten or migrated.",
+      "mechanism": "_require_v2_schema reads line 1, requires exact-int schema_version == 2, then validates it as the genesis-linked record; _validate_record repeats the version check per record.",
+      "threat": "Silent migrations that rewrite, and could launder, history.",
+      "refs": ["src/codex_harness/ledger.py:30-32", "src/codex_harness/ledger.py:1162-1172", "src/codex_harness/ledger.py:1623-1665"],
+      "tests": ["tests/test_ledger_v2.py::test_v1_ledger_is_typed_unsupported_and_never_rewritten"],
+      "coupling": "host-neutral",
+      "loc": 45,
+      "g1_hint": "keep: version the format from day one and treat any migration as a new ledger, never an in-place rewrite."
+    },
+    {
+      "id": "LED-55",
+      "name": "Every read re-verifies the whole chain",
+      "statement": "Every read or verify MUST re-validate the entire chain against the head from the bytes on disk, trusting nothing cached from earlier calls.",
+      "mechanism": "read() and verify() run _validate_parent_readonly and _pristine_uninitialized, then _read_with_shared_lock, _read_locked and _validate_stream; matching() and latest() call read() each time.",
+      "threat": "Stale caches hiding tampering that happened between calls.",
+      "refs": ["src/codex_harness/ledger.py:1667-1741", "src/codex_harness/ledger.py:2465-2485"],
+      "tests": ["tests/test_ledger_v2.py::test_full_verification_hashes_and_canonicalizes_once_per_record", "tests/test_ledger_v2.py::test_ten_thousand_record_complexity_benchmark_completes"],
+      "coupling": "host-neutral",
+      "loc": 75,
+      "g1_hint": "keep: re-verify at each trust decision (for example before accepting 'done') and cache only within one locked operation."
+    },
+    {
+      "id": "LED-56",
+      "name": "status() never raises, classifies state",
+      "statement": "status() MUST return uninitialized, blocked with a failure_code, append_recovery_required, or the ready verify summary, converting every HarnessError into blocked.",
+      "mechanism": "Presence and journal pre-checks, then verify(); except HarnessError returns {state: blocked, failure_code, error}.",
+      "threat": "Diagnostic surfaces crashing with tracebacks instead of reporting a typed fail-closed state.",
+      "refs": ["src/codex_harness/ledger.py:2428-2463"],
+      "tests": ["tests/test_ledger_v2.py::test_cli_normalizes_corrupt_ledger_without_traceback", "tests/test_ledger_canonicality.py::test_malformed_state_has_one_core_code_across_surfaces", "tests/test_ledger_canonicality.py::test_pristine_read_only_surfaces_remain_uninitialized"],
+      "coupling": "host-neutral",
+      "loc": 36,
+      "g1_hint": "keep: one typed state feeds the omp status line and session_start injection; also catch OSError, which T1 lets escape."
+    },
+    {
+      "id": "LED-57",
+      "name": "Stable typed failure codes",
+      "statement": "Every ledger failure MUST raise HarnessError with a stable machine code specific to file kind and failure (e.g. ledger_tail_truncated, ledger_unanchored_tail, ledger_head_symlink, ledger_pending_corrupt), shared by all surfaces.",
+      "mechanism": "HarnessError(code=...) throughout; _symlink_code and _unsafe_code derive per-kind codes; _schema_failure appends the line number; status, report, doctor and hooks surface the same code.",
+      "threat": "Untyped tracebacks that an agent can misread or argue past; inconsistent diagnoses across surfaces.",
+      "refs": ["src/codex_harness/util.py:16-21", "src/codex_harness/ledger.py:269-279", "src/codex_harness/ledger.py:710-714"],
+      "tests": ["tests/test_ledger_canonicality.py::test_malformed_state_has_one_core_code_across_surfaces", "tests/test_ledger_canonicality.py::test_lost_state_is_typed_across_every_surface_without_repair", "tests/test_security_core.py::test_ledger_open_io_errors_are_normalized"],
+      "coupling": "host-neutral",
+      "loc": 20,
+      "g1_hint": "keep: machine codes let G1 gate on exact failures without parsing prose."
+    },
+    {
+      "id": "LED-58",
+      "name": "Flattened decoded view with alias fields",
+      "statement": "Readers receive each record as one flat dict of envelope fields, payload fields and aliases (event, prior_ledger_seq, prior_ledger_hash, receipt_hash).",
+      "mechanism": "_decode_record copies envelope fields, adds aliases, includes task_id only when non-null and merges the payload, which is safe only because of LED-35.",
+      "threat": "principle",
+      "refs": ["src/codex_harness/ledger.py:1476-1494"],
+      "tests": [],
+      "coupling": "host-neutral",
+      "loc": 18,
+      "g1_hint": "drop: aliases duplicate envelope fields; expose envelope and payload separately with one name per concept."
+    },
+    {
+      "id": "LED-59",
+      "name": "Linear verify, constant-work ordinary append",
+      "statement": "Full verification MUST be one streaming O(n) pass, and ordinary appends (registration, invalidation, verification results) MUST do O(1) existing-record work; lifecycle appends (status, completion, contract update, verification start) may read O(n).",
+      "mechanism": "_validate_stream readline loop; needs_full_read in _append_locked; last_append_metrics and last_verify_metrics; scripts/benchmark_ledger_v2.py checks these up to 10,000 records.",
+      "threat": "Verification cost growing until it is skipped in practice; lock hold times growing with history.",
+      "refs": ["src/codex_harness/ledger.py:1615-1620", "src/codex_harness/ledger.py:2070-2095", "src/codex_harness/ledger.py:2177-2186", "scripts/benchmark_ledger_v2.py:102-193"],
+      "tests": ["tests/test_ledger_v2.py::test_append_existing_record_work_is_constant", "tests/test_ledger_v2.py::test_full_verification_hashes_and_canonicalizes_once_per_record", "tests/test_ledger_v2.py::test_ten_thousand_record_complexity_benchmark_completes", "tests/test_ledger_canonicality.py::test_ordinary_append_metrics_remain_tail_only"],
+      "coupling": "host-neutral",
+      "loc": 40,
+      "g1_hint": "modify: keep the complexity contract but measure it with real call counters; T1 reports hardcoded constants."
+    },
+    {
+      "id": "LED-60",
+      "name": "Same-user rewrite out of scope",
+      "statement": "The chain plus head is tamper-evident only against partial edits; anyone able to write both files (same OS user or root) can rewrite history or roll back to an older pair, and it will verify.",
+      "mechanism": "No secret key, signature or external witness: ledger_id is public, hashes are unkeyed, and the head sits beside the ledger in the repo's .harness. The v2 report states this, and test helpers rebuild valid chain+head pairs by hand.",
+      "threat": "The agent (same user) forging a full ledger, or copying back an older ledger+head pair to erase an invalidation and revive a completion.",
+      "refs": ["CODEX_ROOT_HARNESS_LEDGER_V2_REPORT.md:203", "src/codex_harness/ledger.py:192-196", "tests/helpers.py:104-167", "tests/test_core_isolation.py:182-210"],
+      "tests": ["tests/test_core_isolation.py::test_historical_optional_events_are_readable_and_inert"],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "modify: this is the decisive gap for G1 because the LLM runs as the same user; add a MAC keyed outside agent reach or an external witness, and keep the head copy outside agent-reachable paths, with omp tool_call blocking only as defense in depth."
+    },
+    {
+      "id": "LED-61",
+      "name": "Ledger checks shape, not truth",
+      "statement": "Append validates payload structure and lifecycle ordering but not the truth of digests, exit codes or attempt pairing; truth depends entirely on which process writes.",
+      "mechanism": "Append never checks that a verification_succeeded/failed pairs with a prior verification_started attempt_id, that digests were computed by the harness, or that old_contract_hash matches the registered contract; tests append unpaired success receipts directly.",
+      "threat": "Any caller with API or CLI access, including an agent, minting plausible success receipts.",
+      "refs": ["src/codex_harness/ledger.py:958-1127", "src/codex_harness/ledger.py:2070-2091", "tests/test_completion_boundary_remediation.py:89-125"],
+      "tests": ["tests/test_completion_boundary_remediation.py::test_every_required_later_task_frontier_makes_completion_binding_stale", "tests/test_core_isolation.py::test_legacy_binding_is_prefix_bounded_against_post_completion_success"],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "modify: in G1 only the extension process appends, the agent never gets a write path, and every result must pair with a harness-recorded start (same attempt, command digest, contract)."
+    }
+  ],
+  "findings": [
+    {
+      "kind": "limitation",
+      "detail": "Same-user or root can rewrite ledger and head consistently, or copy back an older pair. There is no key, signature or external witness, so a rollback that erases a later task_invalidated revives a completion undetected. This is the documented trust boundary, and test helpers rebuild valid chains by hand.",
+      "refs": ["CODEX_ROOT_HARNESS_LEDGER_V2_REPORT.md:203", "tests/helpers.py:104-167", "tests/test_core_isolation.py:182-210", "src/codex_harness/ledger.py:192-196"]
+    },
+    {
+      "kind": "inconsistency",
+      "detail": "_validate_event_payload has no write/read mode, so append() still accepts legacy verification_started {command, workspace}, legacy verification_succeeded {command, exit_code, failure null, manifest, timed_out false} and the retired oracle triple. A digest-free legacy success then satisfies _validate_completion_binding, which checks only event, exit_code, task and contract.",
+      "refs": ["src/codex_harness/ledger.py:958-985", "src/codex_harness/ledger.py:1011", "src/codex_harness/ledger.py:1013-1035", "src/codex_harness/ledger.py:1100", "src/codex_harness/ledger.py:1942-1950"]
+    },
+    {
+      "kind": "limitation",
+      "detail": "Append-time semantic gaps. Success/failure results are not paired with a prior verification_started attempt. old_contract_hash is not checked against the registered contract. Completed tasks block only status changes, contract updates and verification_started, because needs_full_read excludes the other events. Tests append unpaired and post-completion success receipts directly.",
+      "refs": ["src/codex_harness/ledger.py:2070-2091", "tests/test_completion_boundary_remediation.py:89-125", "tests/test_core_isolation.py:277"]
+    },
+    {
+      "kind": "bug",
+      "detail": "verify() discards the head loaded under the shared lock and reloads it unlocked. Returned last_seq/last_record_hash can therefore describe a newer head than the receipts it verified, and a head deleted in between yields state 'uninitialized' with receipts > 0.",
+      "refs": ["src/codex_harness/ledger.py:1723-1741"]
+    },
+    {
+      "kind": "dead-code",
+      "detail": "_bootstrap_locked lines 1765-1766 are provably unreachable and the condition at 1767 is always true. The AssertionErrors at 1672 and 1764 are reachable only through non-cooperating races and would escape untyped. status() 2435-2436 fires only if both files vanish mid-call, and then reports 'uninitialized' without the pristine proof.",
+      "refs": ["src/codex_harness/ledger.py:1671-1672", "src/codex_harness/ledger.py:1758-1767", "src/codex_harness/ledger.py:2435-2436"]
+    },
+    {
+      "kind": "inconsistency",
+      "detail": "Complexity metrics are asserted, not measured. Append reports canonicalizations=1 and hashes=1 while doing about 11 canonical_json and 5 SHA-256 calls on a non-empty ledger. Verify counters tick once per loop although each record is canonicalized twice and line 1 is validated twice. full_read_called is true when caller-supplied receipts skip the read. The benchmark hardcodes locked_calls, and the once-per-record test is tautological.",
+      "refs": ["src/codex_harness/ledger.py:2177-2186", "src/codex_harness/ledger.py:2080", "src/codex_harness/ledger.py:1587-1588", "scripts/benchmark_ledger_v2.py:178-184", "tests/test_ledger_v2.py:429-447"]
+    },
+    {
+      "kind": "bug",
+      "detail": "Latent: _append_locked trusts caller-supplied locked_receipts for binding, staleness and terminal checks without checking len == head.last_seq and tail hash == head.last_record_hash. Current callers are correct, but a stale or edited list silently weakens every lifecycle check.",
+      "refs": ["src/codex_harness/ledger.py:2075-2091"]
+    },
+    {
+      "kind": "inconsistency",
+      "detail": "Some OSErrors escape untyped (os.fstat at 440/458, os.dup at 1565/1637, readline at 1641). They bypass status()'s HarnessError catch and _append_locked's ledger_transaction_incomplete wrapping. The journal still forces fail-closed, but the typed-code contract breaks.",
+      "refs": ["src/codex_harness/ledger.py:440", "src/codex_harness/ledger.py:458", "src/codex_harness/ledger.py:1565", "src/codex_harness/ledger.py:1637-1641", "src/codex_harness/ledger.py:2188-2194", "src/codex_harness/ledger.py:2457-2463"]
+    },
+    {
+      "kind": "limitation",
+      "detail": "flock blocks with no timeout, so a stopped lock holder hangs every reader and writer. After acquiring, nothing re-checks that ledger.lock still names the locked inode, so an external unlink-and-recreate splits mutual exclusion.",
+      "refs": ["src/codex_harness/ledger.py:1420-1432", "src/codex_harness/ledger.py:1459-1467"]
+    },
+    {
+      "kind": "limitation",
+      "detail": "File safety is path-based. .harness is validated once, then every open re-resolves the full path, and O_NOFOLLOW guards only the final component, so swapping .harness for a symlink after validation redirects reads. There is no st_uid check anywhere, and the 0600/0700 modes are set on write but never verified on read.",
+      "refs": ["src/codex_harness/ledger.py:205-217", "src/codex_harness/ledger.py:219-267", "src/codex_harness/ledger.py:321-325"]
+    },
+    {
+      "kind": "limitation",
+      "detail": "Genesis is not journaled. begin_task writes plan.md, then creates the empty ledger, then the seq-0 head. Its rollback runs only on exceptions, so a crash in between leaves a permanent ledger_state_missing or ledger_head_missing with no recover() path.",
+      "refs": ["src/codex_harness/plan.py:623-644", "src/codex_harness/ledger.py:1767-1785"]
+    },
+    {
+      "kind": "limitation",
+      "detail": "A torn record (old offset < size < new offset) always needs manual repair even though the journal holds the exact intended line. Recovery also loads the whole ledger into memory with no size limit.",
+      "refs": ["src/codex_harness/ledger.py:2365", "src/codex_harness/ledger.py:2377-2381"]
+    },
+    {
+      "kind": "dead-code",
+      "detail": "progress_signature has no callers anywhere, and matching()/latest() are used only by tests (each re-verifies the full chain). last_verify_metrics and last_append_metrics['cleanup_warning'] are never read, so a post-commit directory-fsync failure is silently dropped.",
+      "refs": ["src/codex_harness/ledger.py:199", "src/codex_harness/ledger.py:2185", "src/codex_harness/ledger.py:2465-2485", "src/codex_harness/ledger.py:2487-2500"]
+    },
+    {
+      "kind": "dead-code",
+      "detail": "receipt_id is minted and validated but consumed nowhere in src. The journal phase field can only ever be 'prepared'. _decode_record adds four alias keys that duplicate envelope fields.",
+      "refs": ["src/codex_harness/ledger.py:831-834", "src/codex_harness/ledger.py:2054", "src/codex_harness/ledger.py:2134", "src/codex_harness/ledger.py:2259-2260", "src/codex_harness/ledger.py:1477-1494"]
+    },
+    {
+      "kind": "inconsistency",
+      "detail": "Read-time validation is structural only. Completion bindings are shape-checked but not checked to point at a same-task, successful, non-stale receipt, and unbound complete transitions and legacy events are accepted at any position. The semantic re-checks live in completion.py, so Ledger.read() alone does not certify lifecycle invariants of a rewritten chain.",
+      "refs": ["src/codex_harness/ledger.py:820-821", "src/codex_harness/ledger.py:892-933", "src/codex_harness/ledger.py:1936-1972", "src/codex_harness/completion.py:303-324"]
+    },
+    {
+      "kind": "inconsistency",
+      "detail": "Free-text and path fields are unevenly constrained. The task_invalidated reason must be one line of at most 2048 B, but a contract_update_accepted reason can be any nonempty string. workspace, manifest, allowed_paths and artifact paths are only required to be nonempty (no relative-path or traversal check), and artifact entries are not checked for duplicates or order.",
+      "refs": ["src/codex_harness/ledger.py:751-753", "src/codex_harness/ledger.py:862", "src/codex_harness/ledger.py:881-886", "src/codex_harness/ledger.py:944-955", "src/codex_harness/ledger.py:967", "src/codex_harness/ledger.py:1065-1066"]
+    },
+    {
+      "kind": "limitation",
+      "detail": "A crash between temp creation and rename leaves .<name>.<hex>.tmp files that are never swept. Record timestamps and head updated_at are writer wall-clock values checked only for format, never for monotonicity.",
+      "refs": ["src/codex_harness/ledger.py:424", "src/codex_harness/ledger.py:473-479", "src/codex_harness/ledger.py:1215-1218", "src/codex_harness/ledger.py:1506"]
+    },
+    {
+      "kind": "limitation",
+      "detail": "The pristine-genesis proof couples the ledger to T1's plan module and markdown markers. It also hardcodes the Codex-specific evidence/real-codex-smoke directory and never inspects its contents.",
+      "refs": ["src/codex_harness/ledger.py:1326-1347", "src/codex_harness/ledger.py:1368-1371"]
+    },
+    {
+      "kind": "limitation",
+      "detail": "The canonical form is Python-specific (code-point key sort, Python float repr, integers up to 2^63-1). A TS/Bun G1 cannot reproduce record hashes without re-specifying canonicalization, e.g. RFC 8785, no floats, integers <= 2^53-1.",
+      "refs": ["src/codex_harness/util.py:32-39", "src/codex_harness/ledger.py:36", "src/codex_harness/ledger.py:172-179"]
+    },
+    {
+      "kind": "limitation",
+      "detail": "No test exercises writer or reader reserved-field rejection, ledger_uninitialized, the lockless-read ledger_race, ledger_hardening_unavailable or a directory-fsync failure; these invariants are backed only by code.",
+      "refs": ["src/codex_harness/ledger.py:236-240", "src/codex_harness/ledger.py:816-819", "src/codex_harness/ledger.py:1440-1444", "src/codex_harness/ledger.py:1758-1763", "src/codex_harness/ledger.py:2031-2049"]
+    },
+    {
+      "kind": "inconsistency",
+      "detail": "Vocabularies are duplicated by hand. The completion frontier set re-lists the seven current events. Writer and reader reserved-field lists are separate and differ (receipt_id vs task_id). append() repeats _append_locked's event checks.",
+      "refs": ["src/codex_harness/ledger.py:46-56", "src/codex_harness/ledger.py:101-115", "src/codex_harness/ledger.py:1955-1963", "src/codex_harness/ledger.py:2031-2045", "src/codex_harness/ledger.py:2197-2202"]
+    },
+    {
+      "kind": "limitation",
+      "detail": "Frozen-prefix tests in the ledger suite read the live repository .harness/ledger.jsonl and require new completions beyond the frozen set, which ties the suite verdict to mutable project state.",
+      "refs": ["tests/test_ledger_canonicality.py:1407-1457"]
+    }
+  ]
+}

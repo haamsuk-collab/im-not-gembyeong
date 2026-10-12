@@ -1,0 +1,17 @@
+{
+ "name": "k4-force-continue",
+ "case": "force_continue",
+ "rc": 0,
+ "seconds": 64.1,
+ "status": "SUCCESS",
+ "nonce": "NONCE-218677D4",
+ "nonce_in_reply": false,
+ "files": [
+  "G1_STATE.md",
+  "README.md"
+ ],
+ "response": "OK\nOK\nThere is no task currently in progress. What would you like to work on?\nPlease let me know what you would like me to work on, and I'll get started.\nI'm ready. Please provide a task or instructions, and I will be happy to help.\nStanding by. Please provide the task or instructions you would like me to execute.\nStanding by. Please let me know what you'd like to work on next.\nStanding by. Please",
+ "total_tokens": 180234,
+ "sequence": "SessionStart > PreInvocation[inv=0] > PostInvocation[inv=0] > PreInvocation[inv=1] > PreToolUse(run_command#3) > PostToolUse(run_command#3) > PostInvocation[inv=1] > PreInvocation[inv=2] > PostInvocation[inv=2] > PreInvocation[inv=3] > PostInvocation[inv=3] > PreInvocation[inv=4] > PostInvocation[inv=4] > PreInvocation[inv=5] > PostInvocation[inv=5] > PreInvocation[inv=6] > PostInvocation[inv=6] > PreInvocation[inv=7] > PostInvocation[inv=7] > PreInvocation[inv=8] > PostInvocation[inv=8] > PreInvocation[inv=9] > PostInvocation[inv=9] > PreInvocation[inv=10] > PostInvocation[inv=10] > PreInvocation[inv=11] > PostInvocation[inv=11] > PreInvocation[inv=12] > PostInvocation[inv=12] > Stop",
+ "stderr_tail": ""
+}

@@ -1,0 +1,3 @@
+{"event": "SessionStart", "t": 1791700182.7179163, "cid": "3a28f500", "stepIdx": null, "inv": null, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PreInvocation", "t": 1791700182.829661, "cid": "3a28f500", "stepIdx": null, "inv": 0, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "Stop", "t": 1791700182.9478993, "cid": "3a28f500", "stepIdx": null, "inv": null, "tool": null, "args": null, "fullyIdle": true, "reason": "ERROR"}

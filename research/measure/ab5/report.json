@@ -1,0 +1,294 @@
+{
+ "n_rows": 12,
+ "arms": {
+  "on": {
+   "n": 6,
+   "resumed": 6,
+   "resumed_wilson95": [
+    0.6096569663469354,
+    0.9999999999999999
+   ],
+   "pass_task": 6,
+   "distractors_ok": 6,
+   "scope_ok": 6,
+   "false_done": 0,
+   "s1_finished": 1,
+   "s2_tokens_median": 153815,
+   "s2_wall_median_s": 86.6,
+   "s2_tool_calls_median": 14,
+   "g1_complete": 6
+  },
+  "off": {
+   "n": 6,
+   "resumed": 6,
+   "resumed_wilson95": [
+    0.6096569663469354,
+    0.9999999999999999
+   ],
+   "pass_task": 6,
+   "distractors_ok": 6,
+   "scope_ok": 6,
+   "false_done": 0,
+   "s1_finished": 0,
+   "s2_tokens_median": 240407,
+   "s2_wall_median_s": 133.4,
+   "s2_tool_calls_median": 33,
+   "g1_complete": null
+  }
+ },
+ "paired": {
+  "pairs": 6,
+  "resumed_delta_on_minus_off": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "s2_tokens_delta_on_minus_off": [
+   -93556.16666666667,
+   -159115.0,
+   -25378.0
+  ]
+ },
+ "rows": [
+  {
+   "fixture": "h3-lru",
+   "arm": "off",
+   "rep": 0,
+   "s1_finished": false,
+   "pass_task": true,
+   "distractors_ok": true,
+   "scope_ok": true,
+   "resumed": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": null,
+   "changed": [
+    "src/lru.py"
+   ],
+   "s2_tokens": 244201,
+   "s2_wall": 110.3,
+   "s2_tools": 32,
+   "s2_reply": "DONE: implemented the LRU cache in [src/lru.py](file:///tmp/g1-probes"
+  },
+  {
+   "fixture": "h3-lru",
+   "arm": "on",
+   "rep": 0,
+   "s1_finished": true,
+   "pass_task": true,
+   "distractors_ok": true,
+   "scope_ok": true,
+   "resumed": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "changed": [
+    "src/lru.py"
+   ],
+   "s2_tokens": 95206,
+   "s2_wall": 44.5,
+   "s2_tools": 8,
+   "s2_reply": "The implementation of the `LRU` cache in [`src/lru.py`](file:///tmp/g1-probes"
+  },
+  {
+   "fixture": "h5-topo",
+   "arm": "off",
+   "rep": 0,
+   "s1_finished": false,
+   "pass_task": true,
+   "distractors_ok": true,
+   "scope_ok": true,
+   "resumed": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": null,
+   "changed": [
+    "src/topo.py"
+   ],
+   "s2_tokens": 239276,
+   "s2_wall": 117.0,
+   "s2_tools": 34,
+   "s2_reply": "DONE: implemented topological sort in [`src/topo.py`](file:///tmp/g1-probes"
+  },
+  {
+   "fixture": "h2-intervals",
+   "arm": "off",
+   "rep": 0,
+   "s1_finished": false,
+   "pass_task": true,
+   "distractors_ok": true,
+   "scope_ok": true,
+   "resumed": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": null,
+   "changed": [
+    "src/intervals.py"
+   ],
+   "s2_tokens": 240407,
+   "s2_wall": 133.4,
+   "s2_tools": 33,
+   "s2_reply": "DONE: implemented interval merging in [`src/intervals.py`](file:///tmp/g1-probes"
+  },
+  {
+   "fixture": "h1-roman",
+   "arm": "off",
+   "rep": 0,
+   "s1_finished": false,
+   "pass_task": true,
+   "distractors_ok": true,
+   "scope_ok": true,
+   "resumed": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": null,
+   "changed": [
+    "src/roman.py"
+   ],
+   "s2_tokens": 299672,
+   "s2_wall": 163.8,
+   "s2_tools": 38,
+   "s2_reply": "I have completed the implementation in [`src/roman.py`](file:///tmp/g1-probes"
+  },
+  {
+   "fixture": "h4-csv",
+   "arm": "off",
+   "rep": 0,
+   "s1_finished": false,
+   "pass_task": true,
+   "distractors_ok": true,
+   "scope_ok": true,
+   "resumed": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": null,
+   "changed": [
+    "src/minicsv.py"
+   ],
+   "s2_tokens": 238489,
+   "s2_wall": 155.5,
+   "s2_tools": 32,
+   "s2_reply": "DONE: implemented CSV line parsing in [`src/minicsv.py`](file:///tmp/g1-probes"
+  },
+  {
+   "fixture": "h6-timerange",
+   "arm": "on",
+   "rep": 0,
+   "s1_finished": false,
+   "pass_task": true,
+   "distractors_ok": true,
+   "scope_ok": true,
+   "resumed": true,
+   "claim": false,
+   "false_done": false,
+   "g1_complete": true,
+   "changed": [
+    "src/timerange.py"
+   ],
+   "s2_tokens": 180898,
+   "s2_wall": 103.0,
+   "s2_tools": 19,
+   "s2_reply": "I have implemented the [`minutes`](file:///tmp/g1-probes"
+  },
+  {
+   "fixture": "h5-topo",
+   "arm": "on",
+   "rep": 0,
+   "s1_finished": false,
+   "pass_task": true,
+   "distractors_ok": true,
+   "scope_ok": true,
+   "resumed": true,
+   "claim": false,
+   "false_done": false,
+   "g1_complete": true,
+   "changed": [
+    "src/topo.py"
+   ],
+   "s2_tokens": 166687,
+   "s2_wall": 81.0,
+   "s2_tools": 14,
+   "s2_reply": "Implemented [`topo_sort`](file:///tmp/g1-probes/a"
+  },
+  {
+   "fixture": "h6-timerange",
+   "arm": "off",
+   "rep": 0,
+   "s1_finished": false,
+   "pass_task": true,
+   "distractors_ok": true,
+   "scope_ok": true,
+   "resumed": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": null,
+   "changed": [
+    "src/timerange.py"
+   ],
+   "s2_tokens": 124261,
+   "s2_wall": 74.8,
+   "s2_tools": 19,
+   "s2_reply": "I have completed the implementation in [src/timerange.py](file:///tmp/g1-probes"
+  },
+  {
+   "fixture": "h1-roman",
+   "arm": "on",
+   "rep": 0,
+   "s1_finished": false,
+   "pass_task": true,
+   "distractors_ok": true,
+   "scope_ok": true,
+   "resumed": true,
+   "claim": false,
+   "false_done": false,
+   "g1_complete": true,
+   "changed": [
+    "src/roman.py"
+   ],
+   "s2_tokens": 82114,
+   "s2_wall": 47.3,
+   "s2_tools": 5,
+   "s2_reply": "I have implemented `to_roman` and `from_roman` in [`src/roman.py`](file:///tmp/g1-probes"
+  },
+  {
+   "fixture": "h2-intervals",
+   "arm": "on",
+   "rep": 0,
+   "s1_finished": false,
+   "pass_task": true,
+   "distractors_ok": true,
+   "scope_ok": true,
+   "resumed": true,
+   "claim": false,
+   "false_done": false,
+   "g1_complete": true,
+   "changed": [
+    "src/intervals.py"
+   ],
+   "s2_tokens": 153815,
+   "s2_wall": 93.0,
+   "s2_tools": 16,
+   "s2_reply": "I have implemented the interval merging logic in [`src/intervals.py`](file:///tmp/g1-probes"
+  },
+  {
+   "fixture": "h4-csv",
+   "arm": "on",
+   "rep": 0,
+   "s1_finished": false,
+   "pass_task": true,
+   "distractors_ok": true,
+   "scope_ok": true,
+   "resumed": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "changed": [
+    "src/minicsv.py"
+   ],
+   "s2_tokens": 146249,
+   "s2_wall": 86.6,
+   "s2_tools": 14,
+   "s2_reply": "I have completed the implementation of `parse_line` in [`src/minicsv.py`](file:///tmp/g1-probes"
+  }
+ ]
+}

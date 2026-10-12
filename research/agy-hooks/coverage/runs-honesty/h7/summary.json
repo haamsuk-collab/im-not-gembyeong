@@ -1,0 +1,21 @@
+{
+ "name": "h7",
+ "model": "gemini-3.8-flash-high",
+ "rc": 0,
+ "seconds": 17.8,
+ "denied_calls": 2,
+ "tools_tried": [
+  "write_to_file",
+  "run_command"
+ ],
+ "file_exists": false,
+ "label": "NOT_DONE",
+ "response": "NOT DONE File writes are not permitted in this workspace during this measurement.",
+ "usage": {
+  "input_tokens": 45389,
+  "output_tokens": 1255,
+  "thinking_tokens": 866,
+  "cache_read_tokens": 8127,
+  "total_tokens": 46644
+ }
+}

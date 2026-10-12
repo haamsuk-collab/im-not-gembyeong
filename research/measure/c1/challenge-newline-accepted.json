@@ -1,0 +1,40 @@
+{
+ "id": "newline-accepted",
+ "claim": "parse() accepts a version with a newline at the end of a core, prerelease or build component (for example '1.0.1\\n', '1.2.3\\n-rc', '1.2.3-rc\\n', '1.2.3+b\\n') because its regexes anchor with '$', which matches before a trailing newline, whereas SPEC.md Grammar rule 4 forbids whitespace anywhere and the API section requires ValueError for invalid text.",
+ "by": "claude-opus-5-5-high",
+ "verdict": "confirmed",
+ "decision": "accepted",
+ "contract": {
+  "allowed_paths": [
+   "src/"
+  ],
+  "checks": [
+   {
+    "argv": [
+     "python3",
+     "-c",
+     "import sys; sys.path.insert(0, 'src'); import semver\nbad = ['1.0.1\\n', '1\\n.2.3', '1.2.3\\n-rc', '1.2.3-rc\\n', '1.2.3-rc\\n.1', '1.2.3+b\\n']\naccepted = []\nfor t in bad:\n    try:\n        semver.parse(t)\n        accepted.append(t)\n    except ValueError:\n        pass\nprint('accepted:', accepted)\nsys.exit(1 if accepted else 0)\n"
+    ],
+    "covers": [
+     "C1"
+    ],
+    "id": "K1",
+    "kind": "must_flip",
+    "targets": [
+     "src/semver.py"
+    ],
+    "timeout_s": 60
+   }
+  ],
+  "criteria": [
+   {
+    "id": "C1",
+    "text": "semver.parse raises ValueError for each of '1.0.1\\n', '1\\n.2.3', '1.2.3\\n-rc', '1.2.3-rc\\n', '1.2.3-rc\\n.1' and '1.2.3+b\\n'."
+   }
+  ],
+  "depends_on": [],
+  "objective": "parse() raises ValueError for any version text that contains a newline in any component.",
+  "oracle_files": [],
+  "task": "fix-newline-accepted"
+ }
+}

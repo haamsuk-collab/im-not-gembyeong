@@ -1,0 +1,2014 @@
+{
+ "repo": "JinHo-von-Choi/anti-samcheonpo",
+ "commit": "eff2c16a98e8b16124c4f1ce81325e72e9032647",
+ "what_it_is": "anti-samcheonpo (삼천포, v0.7.1, MIT, Go) is a local harness that attaches to coding-agent hooks (Claude Code, Codex, opencode, Antigravity agy, Hermes, OpenClaw; observe-only for Copilot and Cursor) through a thin fail-open hook client and a per-user daemon, and runs a deterministic, event-sourced detector engine (rules S1-S8: over-verification, repeated failure and oscillation, scope drift, read-only streaks, false completion and test weakening, capability limits, memory rot after compaction, cost and session length) over tool calls, tool results and tokens. Detectors nudge first and become pre-execution denies only when acknowledged advice is ignored for the same goal revision, rule and target (at most 3 per session), while user-declared protected paths, budgets and ceilings always block. Completion can be checked by the harness itself running an accepted contract's machine checks at Stop, with evidence keys bound to the contract's authority hash, but that Stop block is opt-in ('validated' rollout mode with an operator-declared digest); by default a false 'done' only produces advice. Everything is stored in a local SQLite ledger (~/.samcheonpo/ledger.db) with an evidence-ledger/1 hash chain and seals, and the repository ships unusually rigorous measurement tooling: a 40-scenario detector DSL, 22 live tasks with independent graders kept outside the agent workspace, paired cluster-bootstrap A/B statistics, a hash-pinned corpus evaluator and an implementation-agnostic conformance suite. Its agy adapter (tested on agy 1.3.x, not 1.1.27) maps decisions to deny, continue and injectSteps and never prints allow or '{}', reads tool results from the transcript because agy's PostToolUse carries none, and by static reading likely drops agy to observe-only on the first non-shell tool result.",
+ "architecture": [
+  "cmd/samcheonpo: cobra CLI (audit, report, receipt, verify, export, handoff, gaps, label, interventions, eval, bench, doctor, install/uninstall, cmd, contract, spec run/task, statusline, daemon) (cmd/samcheonpo/main.go, internal/cli/cli.go:59, internal/cli/livecmd.go:27)",
+  "cmd/samcheonpo-hook: light hook client without CLI/SQLite/SDK imports, GOMAXPROCS(1), spawns the main binary as daemon (cmd/samcheonpo-hook/main.go:17, internal/hookclient/executable.go:55)",
+  "internal/hookclient: thin hook process; one socket request with per-event deadline (PreToolUse 15 ms, Stop 150 s), fail-open on every error, delivery-ack token after printing (internal/hookclient/hookclient.go:26, internal/hookclient/hookclient.go:105)",
+  "internal/live daemon: flock-guarded per-user daemon on a 0600 unix socket with SO_PEERCRED, 256-slot per-session queue, idle exit, version probes (internal/live/daemon.go:95, internal/live/daemon.go:144, internal/live/session.go:657)",
+  "internal/live hooks/session: dispatch of SessionStart/UserPromptSubmit/Inject/PreToolUse/PostToolUse/Stop/PreCompact/SessionEnd, escalation routing, Stop checkpoint gate, pending-advice queue, status label (internal/live/hooks.go:140, internal/live/hooks.go:387, internal/live/hooks.go:695, internal/live/session.go:567, internal/live/session.go:880)",
+  "internal/live/agy.go + dialect.go: agy translation; PreInvocation#0 = prompt, later PreInvocations = advice injection, shell PostToolUse held until transcript line with step_index appears, output mapped to deny/continue/injectSteps (internal/live/agy.go:35, internal/live/agy.go:173, internal/live/agy.go:283, internal/live/dialect.go:141)",
+  "internal/live/checkpoint.go: harness-run contract checks via /bin/sh in a process group, 120 s default timeout, 1 MiB output cap, worktree isolation, before/after tree fingerprint, evidence keys (internal/live/checkpoint.go:87, internal/live/checkpoint.go:212, internal/live/checkpoint.go:297)",
+  "internal/live/ws.go: workspace tree fingerprint via temporary git index plus write-tree (or hashed walk) with fsnotify change generations (internal/live/ws.go:140, internal/live/ws.go:188)",
+  "internal/live rollback/golden/attempts/recovery/ironlaws/useronly/extend: owned-file rollback, passing-point snapshots, failed-edit memory, recovery prescriptions, external iron-laws audit, user-only verb refusal, ceiling extension (internal/live/rollback.go:186, internal/patch/golden_state.go:100, internal/live/attempts.go:54, internal/live/recovery.go:20, internal/live/ironlaws.go:32, internal/live/useronly.go:20, internal/live/extend.go:51)",
+  "internal/detect: S1-S8 engine (Observe/PreCheck/PreGuard/TurnEnd/combine) plus detector files; deterministic over the event sequence, timestamps from events (internal/detect/engine.go:287, internal/detect/engine.go:1382, internal/detect/engine.go:1350, internal/detect/engine.go:1525)",
+  "internal/policy: rollout modes shadow/recommend/validated, ExplicitGuardrail, AdviceOnly, Escalable table, Escalate, capability Decide (internal/policy/rollout.go:11, internal/policy/rollout.go:63, internal/policy/policy.go:13)",
+  "internal/classify + internal/fp + internal/testout: shell/heredoc/script classifiers, test-scope/release/CI readers, cmd/exec/error/result/workspace fingerprints (128-bit truncated SHA-256), ordered failure-cause table, failed-test extraction (internal/classify/classify.go:110, internal/fp/fp.go:53, internal/fp/errfp.go:57, internal/fp/failclass.go:154, internal/testout/testout.go:28)",
+  "internal/contract + internal/intent: progress-contract/1 and /2 (strict YAML, checks_hash, authority_hash, HMAC-signed acceptance in .samcheonpo/contract.state.json), task-intent/2 revisions and explicit redirect markers (internal/contract/contract.go:125, internal/contract/contract.go:388, internal/contract/contract.go:452, internal/intent/change.go:20)",
+  "internal/verification: evidence key, reuse rules, bounded input fingerprint, single-flight cache, candidate/reusable/invalidated/manual planner (internal/verification/evidence.go:17, internal/verification/fingerprint.go:19, internal/verification/cache.go:33, internal/verification/planner.go:32)",
+  "internal/ledger: SQLite (modernc, WAL) at ~/.samcheonpo/ledger.db, migrations 0001-0010 (session, event, verdict, progress, intervention, feedback, task, intent_revision, verification_evidence, recovery_attempt, judge_budget, observation_gap, failed_attempt, rollback, session_observation, receipt_snapshot) (internal/ledger/ledger.go:37, internal/ledger/migrations/0001_init.sql:1, internal/cli/cli.go:69)",
+  "internal/seal + internal/receipt + internal/handoff: evidence-ledger/1 chain and seal, evidence-ledger/2 TaskSeal, receipts with null-not-zero billing, handoff/1 bundles with zero-trust import (internal/seal/seal.go:123, internal/seal/task.go:52, internal/receipt/receipt.go:89, internal/handoff/bundle.go:19)",
+  "internal/recovery + internal/intervene + internal/notify: recovery oracle and prescription limits, 157 Korean templates (.agent/.user/.rx/.say), desktop notifications on by default and optional ntfy/webhook push (internal/recovery/recovery.go:233, internal/intervene/intervene.go:19, internal/notify/notify.go:43)",
+  "internal/judge + internal/cost: optional LLM drift judge (Anthropic SDK or OpenAI-compatible, off by default) with pre-dispatch budget reservation; price table in USD per 1M tokens with fixed FX 1385 KRW/USD and no Gemini rows (internal/judge/judge.go:146, internal/judge/budget.go:30, internal/cost/prices.yml:4)",
+  "internal/adapter: capability profiles and tested version ranges (agy 1.3.x), Claude/Codex transcript parsers, OTLP/JSON file import/export (internal/adapter/caps.go:48, internal/adapter/claude/parser.go:165, internal/adapter/codex/parser.go:516, internal/adapter/otel/otel.go:128)",
+  "internal/install: per-host installers; agy adds a named 'samcheonpo' group to ~/.gemini/config/hooks.json (PreToolUse/PostToolUse matcher '*', PreInvocation, Stop) with exact-entry uninstall and atomic writes (internal/install/jsonhooks.go:170, internal/install/install.go:285)",
+  "plugins: Claude Code plugin (hooks.json, 9 slash commands, agent-facing SKILL.md), Hermes/OpenClaw/opencode forwarders (plugins/claude-code/hooks/hooks.json:3, plugins/claude-code/skills/samcheonpo/SKILL.md:48, plugins/hermes/__init__.py:58, plugins/openclaw/index.js:50, plugins/opencode/samcheonpo.ts:42)",
+  "internal/rules: regex rule data (verify commands, failed tests, forced-continue prompts, auto-continue state files) with must/must-not-match vectors (internal/rules/default.yml:5, internal/rules/rules.go:83)",
+  "measurement: internal/analyze (offline replay and hindsight buckets), internal/eval (Wilson, kappa, corpus), internal/bench (scenario DSL, live A/B with external graders, cluster bootstrap), bench/scenarios (40) and bench/live (22 tasks), conformance/ (10 v1 cases plus v2 task suite), scripts/check-hook-budget.sh (internal/analyze/analyze.go:93, internal/eval/eval.go:157, internal/bench/cluster.go:29, internal/bench/live.go:188, cmd/samcheonpo-conformance/main.go:66)",
+  "state locations: ~/.samcheonpo/{config.yml, ledger.db, acceptance.key, receipts/, backup/rollback/, run/daemon.lock, run/samcheonpo.sock}; project .samcheonpo/{contract.yml, contract.state.json, snapshots/, handoff} and .samcheonpo.yml (internal/cli/cli.go:69, internal/contract/contract.go:393, internal/live/session.go:1012, internal/live/rollback.go:436, internal/live/daemon.go:95, internal/patch/golden_state.go:23)",
+  "rule s1.identical_rerun [S1]: same exec fingerprint + workspace fingerprint + result fingerprint, nudge at 3rd identical run; DETERMINISTIC equality over fingerprints (result fingerprint parsed from output); PostToolUse detection, PreToolUse deny on repeat after advice; agy PreToolUse: partial (needs tree hash and transcript results) (internal/detect/engine.go:424, internal/detect/engine.go:1384)",
+  "rule s1.verify_ratio [S1]: >= 4 verifications per write in a 20-event window with no progress; DETERMINISTIC count over HEURISTIC command categories; advice only; agy PreToolUse: no (internal/detect/engine.go:1217)",
+  "rule s1.test_bloat [S1]: >= 60 test lines and > 3x code lines, unless the request mentions tests; HEURISTIC; record-only L0 (internal/detect/engine.go:1149)",
+  "rule s1.verify_after_docs [S1]: same result after a docs-only change; DETERMINISTIC over HEURISTIC doc-path test; shadow by default (internal/detect/engine.go:584)",
+  "rule s1.review_repeat [S1]: same review/subagent purpose on an unchanged workspace twice; HEURISTIC review detection; shadow by default (internal/detect/engine.go:613)",
+  "rule s1.unprobed_long_run [S1]: stated run > 300 s needs a passed probe, allowed up to max(300 s, 6x longest probe); DETERMINISTIC arithmetic over HEURISTIC duration parsing; PreToolUse (PreGuard) deny on repeat; agy PreToolUse: yes (args + stored probes) (internal/detect/long_run.go:66, internal/detect/long_run.go:82)",
+  "rule s1.full_suite_local_change [S1]: test run whose last duration >= 300 s after a change < 3 files and < 50 lines with no targeted pass; DETERMINISTIC thresholds over HEURISTIC test-scope parsing; PreGuard deny on repeat; agy PreToolUse: partial (durations from transcript) (internal/detect/test_scope.go:84)",
+  "rule s1.explicit_waiting [S1]: >= 3 standalone 'sleep' calls after all criteria met under an accepted temporal requirement; DETERMINISTIC gates, estimate; advice-only, shadow by default (internal/detect/explicit_waiting.go:32, internal/detect/explicit_waiting.go:58)",
+  "rule s1.evidence_rerun [S1]: shell call identical to an accepted pure check with still-valid evidence, key recomputed before deadline minus 2 ms; DETERMINISTIC but timing-dependent; PreToolUse deny after advice (contract required); agy PreToolUse: yes (internal/live/verification_plan.go:64)",
+  "rule s2.stuck_error [S2]: same error fingerprint or failing test across 3/5/8 distinct workspace states (L1/L2/L3), blind key on missing output; DETERMINISTIC counting over HEURISTIC error normalization; PreToolUse deny of an unchanged rerun; agy PreToolUse: partial (internal/detect/engine.go:456, internal/detect/engine.go:1402)",
+  "rule s2.whack_a_mole [S2]: last 5 failures with >= 3 error-key changes and no drop in failing-test count; DETERMINISTIC over parsed failures; L2 advice, escalation needs a contract; agy PreToolUse: no (internal/detect/engine.go:550)",
+  "rule s2.oscillation [S2]: file content hash returns to an earlier non-latest state or an edit exactly reverses an earlier one; DETERMINISTIC hash equality; advice; agy PreToolUse: no (edit chunks not exposed by agy) (internal/detect/engine.go:879)",
+  "rule s2.semantic_oscillation [S2]: file's Go-scanner token fingerprint (identifiers->IDENT, literals->LIT) equals one of 5 recorded failed states with different bytes (256 KiB cap); HEURISTIC normalization; PreToolUse deny before a verify; agy PreToolUse: poor (unbounded disk reads in a fail-closed hook) (internal/detect/ast_oscillation.go:16, internal/detect/ast_oscillation.go:163)",
+  "rule s2.environment [S2]: same external failure class twice (transient 4x) on an unchanged workspace; HEURISTIC class from output, DETERMINISTIC streak; freezes write/edit of source except manifests; PreToolUse deny; agy PreToolUse: yes for the deny (internal/detect/engine.go:664, internal/detect/engine.go:736)",
+  "rule s2.verifier_deadlock [S2]: unknown command with same result >= 2 times across edits (repeat, L2), unchanged rerun (deny), or a 'please choose' final message while rejected (waiting regex); DETERMINISTIC for repeat/unchanged, HEURISTIC for waiting; agy PreToolUse: yes for unchanged_rerun (internal/detect/verifier_deadlock.go:43, internal/detect/verifier_deadlock.go:66, internal/detect/verifier_deadlock.go:86)",
+  "rule s2.flaky_ui_race [S2]: browser-test failures classified as UI timing with only literal/timeout tweaks in between (>= 2); HEURISTIC; advice only (internal/detect/flaky_race.go:23)",
+  "rule s2.attempt_repeat [S2]: edit fingerprint already followed by a failure in this task revision (persisted across sessions); DETERMINISTIC hash match over HEURISTIC failure linkage; PreToolUse advice only; agy PreToolUse: no (agy edits carry no patch) (internal/live/attempts.go:110)",
+  "rule s3.out_of_scope [S3]: write outside accepted contract allow globs (DETERMINISTIC) or outside a scope guessed from prompt path tokens (HEURISTIC estimate, never blocks); advice, escalation needs a contract (internal/detect/engine.go:932, internal/detect/engine.go:984)",
+  "rule s3.config_bypass [S3]: write to a dependency manifest or tool config file (name catalog); HEURISTIC; L1 advice (internal/detect/engine.go:965)",
+  "rule s3.protected_path [S3]: write/edit to an accepted contract's protect glob or to tests when the contract forbids test changes; DETERMINISTIC glob match; PreToolUse deny always; agy PreToolUse: yes (internal/detect/engine.go:1442)",
+  "rule s3.drift [S3]: optional LLM judge every 15 tool events, two consecutive 'drift' labels; NONDETERMINISTIC model judgment; L2 advice; network (internal/live/session.go:1302)",
+  "rule s4.read_only_streak [S4]: >= 20 explore events or >= 10 minutes (with >= 5 events) since the last write, exempt when the request regex says review/analyze; HEURISTIC exemption, DETERMINISTIC count; advice (internal/detect/engine.go:1162)",
+  "rule s4.serial_triage [S4]: re-reading one findings report with 1-2 files edited between reads for 10 cycles; HEURISTIC; advice (internal/detect/mass_triage.go:39)",
+  "rule s5.error_hiding [S5]: added ignore markers/empty catch in source or '|| true' on a verify; HEURISTIC regex over patches; advice, PreToolUse deny when the same kind repeats in the same file; agy PreToolUse: partial (agy edit chunks not reproduced) (internal/detect/engine.go:349, internal/detect/engine.go:1112, internal/detect/engine.go:1428)",
+  "rule s5.test_weakening [S5]: deleted pre-existing tests, skip markers, weakened/replaced assertions, mock substitution, test-infra changes; HEURISTIC regex; AssertionGuard pre-write deny on write/edit tools only; agy PreToolUse: partial (write_to_file content only) (internal/detect/engine.go:1068, internal/detect/assertion_guard.go:46)",
+  "rule s5.answer_copy [S5]: >= 8-char literal from an agent-created test copied into source; HEURISTIC; confidence 0.45 so record-only (internal/detect/engine.go:1119)",
+  "rule s5.false_done [S5]: completion-claim regex in the last 1200 chars (vetoed by any honest-failure phrase) plus last verification failed, stale, unverified, or live checks unmet; HEURISTIC claim, DETERMINISTIC ordering; Stop advice (internal/detect/engine.go:1350, internal/detect/bypass.go:143)",
+  "rule s5.stop_unmet [S5]: accepted contract checks run by the harness fail at Stop; DETERMINISTIC exit-code gate; Stop block (agy continue) at most 2 per prompt, only in validated mode; agy Stop: yes (internal/live/hooks.go:700, internal/live/hooks.go:727)",
+  "rule s5.release_without_preflight / s5.release_rate [S5]: release/publish after an unreproduced CI failure, an unverified code change or an open UI-timing failure, or > 2 releases per hour; DETERMINISTIC sequence checks over HEURISTIC command/CI parsing; PreGuard deny on repeat; agy PreToolUse: yes (internal/detect/release_guard.go:84)",
+  "rule s6.capability_limit [S6]: 3 distinct file-set strategies failing in one error family (L4) or the same files failing 4 times (L2); DETERMINISTIC set logic over HEURISTIC error families; advice plus handoff (internal/detect/engine.go:1657)",
+  "rule s7.memory_rot [S7]: 2 of 3 of >= 2 compactions, re-read ratio >= 25% over >= 10 reads, >= 1 content revisit; HEURISTIC composite; L4 advice plus handoff doc (internal/detect/engine.go:1246)",
+  "rule s8.budget [S8]: 80% (L2) and 100% (L3) of the contract's KRW budget, plus a shared tree budget for linked sessions; DETERMINISTIC over HEURISTIC token pricing; always-blocking guardrail via a PostToolUse turn end (stripped on agy, which lacks InjectPost and EndTurnPost) or a swarm PreToolUse deny (internal/detect/engine.go:1287, internal/live/hooks.go:635, internal/live/hooks.go:105, internal/live/swarm_wire.go:150)",
+  "rule s8.idle_spend / s8.velocity [S8]: spend since progress > max(5000 KRW, 15% budget) over >= 30 tool events; 5-minute per-minute spend >= 3x median earlier minute and > 300 KRW/min after 15 minutes; statistics over cost; advice (internal/detect/engine.go:1312, internal/detect/engine.go:1339)",
+  "rule s8.forced_no_progress [S8]: 3 auto-continue turns (regex-recognized) without progress; DETERMINISTIC count over HEURISTIC prompt recognition; advice (internal/detect/engine.go:1268)",
+  "rule s8.session_long / s8.session_ceiling [S8]: notice at 2 h or 10M tokens, warn at 4 h or 30M, and past a configured or contracted ceiling deny every non-read call; DETERMINISTIC; ceiling is an always-blocking PreToolUse guardrail; agy PreToolUse: yes (internal/detect/session_ceiling.go:69, internal/detect/session_ceiling.go:99)",
+  "rule s8.progress_stall [S8]: >= 3 comparable harness-check failures over >= 5 tool events with >= 2 input hashes and no strict-subset shrink; DETERMINISTIC over harness-run facts; advice-only, shadow by default (internal/detect/progress_stall.go:27, internal/detect/progress_stall.go:100)"
+ ],
+ "atoms": [
+  {
+   "id": "ASC-01",
+   "name": "Harness-run checks gate Stop, but opt-in",
+   "statement": "At Stop the harness runs the accepted contract's machine checks itself and, if any fails, may refuse the stop (agy: continue) at most MaxStopBlocks=2 times per user prompt, but in the default 'recommend' rollout this block never fires because s5.stop_unmet can only block after advice for it was delivered, and that advice is only ever produced by the block itself.",
+   "mechanism": "onStop() calls checkpoint(false), collects failed non-skipped results as unmet, and blocks only if routeFor(s5.stop_unmet) returns block (internal/live/hooks.go:695-752, internal/config/config.go:206); in recommend mode RolloutRoute returns advice for every non-guardrail rule (internal/policy/rollout.go:22-24) and advised keys are set only from PreToolUse advice and delivered pending messages (internal/live/hooks.go:507, internal/live/session.go:695), so the block needs validated mode with an operator digest, which is exactly how TestContractFlowAndStop enables it (internal/live/rollout_test.go:13-22, internal/live/live_test.go:279-323). The counter resets on every prompt (internal/live/hooks.go:266); for agy a block becomes {\"decision\":\"continue\"} (internal/live/agy.go:298-302).",
+   "refs": [
+    "internal/live/hooks.go:700",
+    "internal/live/hooks.go:705",
+    "internal/live/hooks.go:727",
+    "internal/policy/rollout.go:22",
+    "internal/live/rollout_test.go:15",
+    "internal/live/live_test.go:279",
+    "internal/live/hooks.go:266",
+    "internal/config/config.go:206",
+    "internal/live/agy.go:299"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "duplicate-of:T1 completion gate + bounded loops",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P4",
+    "P6",
+    "PH",
+    "Z4"
+   ],
+   "principle_conflict": [
+    "P4: completion enforcement is off by default (opt-in via validated mode); a false DONE ends the turn and only becomes next-turn advice",
+    "P5: no receipt is bound; the continuation is not tied to an exact verification digest",
+    "agy: stop_hook_active is absent, so the per-prompt bound depends on PreInvocation invocationNum semantics"
+   ],
+   "proof_purpose": "The harness's own checks fail on the current tree, so allowing the stop would be a false completion.",
+   "hook_mapping": "Stop",
+   "g1_design": "G1's Stop hook always runs its own verification (no opt-in), writes a receipt, and returns continue with the receipt digest and failing criteria while the control vector shows displacement; it counts its own continues in the ledger (cap well under agy's 10) instead of relying on host flags.",
+   "cost": "medium"
+  },
+  {
+   "id": "ASC-02",
+   "name": "Discard check results if identity changed mid-run",
+   "statement": "A harness-run checkpoint result is applied only if the contract revision, task id and intent revision are unchanged and no observation was lost between the start and end of the run; otherwise every result is marked not passed and skipped.",
+   "mechanism": "checkpoint() snapshots contractRevision and evidenceIdentity before RunTaskRevision and compares them after, rewriting results to Pass=false with a skip reason on any change or queue loss (internal/live/session.go:764-797); checks that changed the workspace are recorded as side effects and never counted as met (internal/live/session.go:814-821). Stop counts only non-skipped failures as unmet (internal/live/hooks.go:705-710), so a skipped or side-effecting check does not hold the stop. Any produce, mutating or unknown event also clears passes and a contract change bumps the revision (internal/live/session.go:406-411, internal/live/session.go:291-305).",
+   "refs": [
+    "internal/live/session.go:765",
+    "internal/live/session.go:791",
+    "internal/live/session.go:814",
+    "internal/live/session.go:820",
+    "internal/live/hooks.go:707",
+    "internal/live/session.go:410",
+    "internal/live/reuse_test.go:83"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "duplicate-of:T1 completion gate binding current source and tree (TOCTOU variant)",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P4",
+    "P5",
+    "Z7"
+   ],
+   "principle_conflict": [
+    "P4: treating skipped checks as 'not unmet' lets a stop through without verification; G1 must count skipped as failed"
+   ],
+   "proof_purpose": "The verification receipt describes the same contract, intent revision and tree that existed when it started and when it ended.",
+   "hook_mapping": "Stop",
+   "g1_design": "G1 records contract hash and tree hash before and after its verification run and writes the receipt only if both are equal; any skipped, side-effecting or interrupted criterion makes completion fail closed.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-03",
+   "name": "Grader outside agent tree, digest-pinned",
+   "statement": "In the benchmark harness a trial counts as verified only when a grader copied outside the agent-writable repo exits 0, and the task tree and the grader copy hash identically before the agent ran, before grading and after grading.",
+   "mechanism": "RunTrial digests the task, copies grader/ outside the agent copy and digests it, re-digests both after the agent and the grader after grading, runs the check in the grader directory with BENCH_REPO/BENCH_GRADER, and sets Verified only if exit 0, no timeout and no digest error (internal/bench/live.go:205-222, internal/bench/live.go:295-321); TreeDigest rejects links and special files (internal/bench/protocol.go:49-89).",
+   "refs": [
+    "internal/bench/live.go:205",
+    "internal/bench/live.go:217",
+    "internal/bench/live.go:303",
+    "internal/bench/live.go:311",
+    "internal/bench/live.go:321",
+    "internal/bench/protocol.go:49",
+    "internal/bench/protocol_test.go:156"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "duplicate-of:T1 self-run verification in a scrubbed environment (adds an oracle kept outside the agent-writable tree with pre/post oracle digests)",
+   "verdict": "adopt",
+   "principle_fit": [
+    "P4",
+    "P5",
+    "Z2",
+    "Z5",
+    "Z7"
+   ],
+   "principle_conflict": [],
+   "proof_purpose": "The acceptance oracle G1 ran is byte-identical to the contracted oracle and was outside the agent's write reach for the whole run.",
+   "hook_mapping": "Stop",
+   "g1_design": "G1 stores acceptance checks under a G1-owned directory outside the workspace, pins their tree digest in the contract hash, re-digests before and after each Stop verification, and voids the receipt on any mismatch or link.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-04",
+   "name": "Graders must observe expected behavior, not exit 0",
+   "statement": "Benchmark graders run the candidate in a subprocess and compare exact expected outputs, and the suite proves that an emptied test file or a 'raise SystemExit(0)' submission fails.",
+   "mechanism": "Each bench/live task's grader/verify.py executes the submission and diffs JSON results against cases.json, including input-mutation checks (bench/live/fix-median/grader/verify.py:19-31); TestPublicTaskSuiteIndependentOracles and TestExternalGraderRejectsTestWeakening inject exit(0) and weakened tests and require failure (internal/bench/task_suite_test.go:13-83, internal/bench/protocol_test.go:156-176).",
+   "refs": [
+    "bench/live/fix-median/grader/verify.py:19",
+    "bench/live/loop-service-down/grader/verify.py:30",
+    "internal/bench/task_suite_test.go:76",
+    "internal/bench/protocol_test.go:156",
+    "internal/bench/protocol_test.go:175"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adopt",
+   "principle_fit": [
+    "P4",
+    "Z2",
+    "Z4",
+    "Z5"
+   ],
+   "principle_conflict": [],
+   "proof_purpose": "A criterion passed because the expected behavior was observed, not because a process exited 0.",
+   "hook_mapping": "outside-hooks",
+   "g1_design": "Contract lint: every acceptance criterion's check must assert concrete expected output; G1's contract test suite includes an exit(0) stub and an emptied-test mutant that must both fail, otherwise the contract is rejected (zero row in the coverage matrix).",
+   "cost": "medium"
+  },
+  {
+   "id": "ASC-05",
+   "name": "Seal pins evaluator, config and price versions",
+   "statement": "Every session seal records the evaluator version, the hash of the effective merged config and the price-table version next to the chain head, and verification fails on any version mismatch or when a reopened observation makes the stored analysis stale.",
+   "mechanism": "Seal fields include evaluator, price_version and config_hash (internal/seal/seal.go:30-44, internal/ledger/ledger.go:131-140, internal/config/config.go:467-471); verify compares them and the head after re-analysis (internal/cli/cli.go:770-830); stored receipts are recomputed and DeepEqual-compared before issuance and refused while close_reason is open (internal/ledger/stored.go:40-82, internal/ledger/stored.go:51-53).",
+   "refs": [
+    "internal/seal/seal.go:30",
+    "internal/ledger/ledger.go:131",
+    "internal/config/config.go:467",
+    "internal/cli/cli.go:770",
+    "internal/ledger/stored.go:51",
+    "internal/ledger/stored.go:72"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "duplicate-of:T1 completion gate binding receipt seq and hash (adds evaluator/policy version binding)",
+   "verdict": "adopt",
+   "principle_fit": [
+    "P5",
+    "P7",
+    "Z7"
+   ],
+   "principle_conflict": [],
+   "proof_purpose": "The completion receipt was produced by G1 version V under the exact merged hook policy H, and nothing was observed after it.",
+   "hook_mapping": "Stop",
+   "g1_design": "Add G1's evaluator version and the SHA-256 of the effective merged policy (global plus workspace hooks.json plus G1 config) to every receipt; any later event for the task or a version/policy mismatch at re-check voids the receipt.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-06",
+   "name": "Imported evidence never becomes authority",
+   "statement": "A handoff bundle is strictly decoded and treated as history: a past pass becomes reusable only if the receiver independently accepted the same contract, recomputes matching local input/environment keys, already holds an identical evidence record in its own ledger, and has no observation gap.",
+   "mechanism": "Bundles are version-pinned, capped at 4 MiB, reject unknown fields and trailing data, and check cross-field identity (internal/handoff/bundle.go:19-145); inspect --verify-inputs requires the receiver's MAC-valid acceptance, fresh local keys and an identical ledger record, and never executes commands (internal/cli/handoff_bundle.go:125-198, internal/cli/handoff_bundle_test.go:105-118).",
+   "refs": [
+    "internal/handoff/bundle.go:19",
+    "internal/handoff/bundle.go:108",
+    "internal/handoff/bundle.go:156",
+    "internal/cli/handoff_bundle.go:133",
+    "internal/cli/handoff_bundle.go:150",
+    "internal/cli/handoff_bundle_test.go:105"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adopt",
+   "principle_fit": [
+    "P1",
+    "P3",
+    "Z5",
+    "TW"
+   ],
+   "principle_conflict": [],
+   "proof_purpose": "A fresh agent inherits only facts present in G1's own ledger whose keys still match the current tree and contract.",
+   "hook_mapping": "SessionStart",
+   "g1_design": "At SessionStart G1 rehydrates only from its ledger; transcripts, memories and agent-written handoff files are data, and an old receipt is trusted only after G1 recomputes its key against the current tree and contract.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-07",
+   "name": "Strict contract schema with one check per criterion",
+   "statement": "A contract with any unknown key is invalid as a whole, every done item has exactly one of a machine check (expect exit0) or a manual condition, ids are unique, and globs, budgets and v2 reuse settings are validated.",
+   "mechanism": "Parse decodes with yaml KnownFields(true) and validates goal, done items, expect/isolation values, duplicate ids, doublestar globs, non-negative budgets and v2 reuse constraints (internal/contract/contract.go:125-205); the spec explains that typos must not silently drop conditions (docs/spec/progress-contract-v1.md:10).",
+   "refs": [
+    "internal/contract/contract.go:125",
+    "internal/contract/contract.go:136",
+    "internal/contract/contract.go:164",
+    "internal/contract/contract.go:178",
+    "docs/spec/progress-contract-v1.md:10"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "duplicate-of:T1 immutable task contracts with contract hash",
+   "verdict": "adopt",
+   "principle_fit": [
+    "P4",
+    "P8",
+    "Z7"
+   ],
+   "principle_conflict": [
+    "P4: manual conditions cannot be verified by G1"
+   ],
+   "proof_purpose": "The contract parsed exactly and every acceptance criterion maps to at least one deterministic check.",
+   "hook_mapping": "outside-hooks",
+   "g1_design": "Strict decode of G1 contracts; build the criteria x checks coverage matrix at load and reject the contract if any row is zero (manual-only criteria count as zero).",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-08",
+   "name": "Checks hash keys reuse; authority hash keys acceptance",
+   "statement": "The contract has two digests: checks_hash over machine checks keys result reuse, while authority_hash over the canonical JSON of the whole contract decides whether an acceptance is valid, so editing any field (goal, scope, budget, forbid, temporal requirement) makes the acceptance stale and a redirect revokes it before any edit.",
+   "mechanism": "ChecksHash and AuthorityDigest (internal/contract/contract.go:224-236, internal/contract/contract.go:385-391); CurrentState marks an accepted state stale on any hash or MAC mismatch (internal/contract/contract.go:371-383); RequestChange writes a draft with the previous file hash and Accept refuses an unchanged file (internal/contract/contract.go:489-516, internal/live/hooks.go:270-279).",
+   "refs": [
+    "internal/contract/contract.go:224",
+    "internal/contract/contract.go:388",
+    "internal/contract/contract.go:379",
+    "internal/contract/contract.go:505",
+    "internal/live/hooks.go:272"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "duplicate-of:T1 immutable task contracts with contract hash",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P4",
+    "P5",
+    "Z6",
+    "Z7"
+   ],
+   "principle_conflict": [
+    "P6: re-acceptance is a manual user step"
+   ],
+   "proof_purpose": "This pass ran under exactly contract authority A, and no completion binds to a superseded contract.",
+   "hook_mapping": "Stop",
+   "g1_design": "Receipt keys include the full contract hash; a superseded contract hash is recorded in the ledger at the moment the goal changes, before any agent edit.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-09",
+   "name": "HMAC-signed acceptance with a home-directory key",
+   "statement": "Contract acceptance records are MACed with HMAC-SHA256 under a random 32-byte key in the user's home, so agent-written or copied state files are treated as stale, but the key is readable by the agent's own OS user and only accepted states are checked.",
+   "mechanism": "acceptance.key is created 0600 via temp file plus os.Link and verification never creates it (internal/contract/contract.go:393-484); the MAC covers the absolute project root and the state JSON with the MAC field empty (internal/contract/contract.go:452-460); CurrentState verifies the MAC only for the accepted state (internal/contract/contract.go:379).",
+   "refs": [
+    "internal/contract/contract.go:393",
+    "internal/contract/contract.go:452",
+    "internal/contract/contract.go:379",
+    "internal/contract/contract_test.go:164"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "reject",
+   "principle_fit": [
+    "Z1",
+    "Z5"
+   ],
+   "principle_conflict": [
+    "Z1/Z7: the agent runs as the same OS user and can read the key",
+    "P6: acceptance is a manual step",
+    "forged non-accepted states (skipped, done) are honored unauthenticated"
+   ],
+   "proof_purpose": "none: a MAC under a key the agent's OS user can read is not tamper-evident against the agent.",
+   "hook_mapping": "outside-hooks",
+   "g1_design": "",
+   "cost": "medium"
+  },
+  {
+   "id": "ASC-10",
+   "name": "User-origin contiguous intent revisions, explicit redirects",
+   "statement": "A task's goal revisions are contiguous, require user-origin provenance assigned by the ingress adapter (never tool output or imported text), are idempotent on exact replay and conflict on overwrite, and only fixed prefixes ('Change goal:', '목표 변경:', '/samcheonpo:edit') redirect the goal.",
+   "mechanism": "Revisions require Origin=user, session, event and time with Parent=Number-1 and Draft=true (internal/intent/intent.go:78-109); SaveTaskRevision uses INSERT ... DO NOTHING plus payload comparison and checks the parent against the current maximum (internal/ledger/task.go:16-84); ClassifyChange accepts only the fixed markers and ignores tool/imported origins (internal/intent/change.go:20-43); forced prompts are not recorded as intent (internal/live/hooks.go:281-283).",
+   "refs": [
+    "internal/intent/intent.go:78",
+    "internal/intent/intent.go:96",
+    "internal/ledger/task.go:63",
+    "internal/ledger/task.go:73",
+    "internal/intent/change.go:20",
+    "internal/live/hooks.go:281"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "duplicate-of:T1 immutable task contracts with contract hash",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P1",
+    "P3",
+    "Z3",
+    "Z4",
+    "Z6"
+   ],
+   "principle_conflict": [
+    "Z6: G1 distrusts even user instructions; a marker only opens a new revision, it never grants authority"
+   ],
+   "proof_purpose": "Goal revision n descends from a user-role transcript record at (conversation, step), and no tool output ever amended the goal.",
+   "hook_mapping": "PreInvocation",
+   "g1_design": "G1 derives user origin only from host-structured USER_INPUT transcript records; an explicit marker appends revision n+1, which supersedes older evidence and requires a new contract hash.",
+   "cost": "medium"
+  },
+  {
+   "id": "ASC-11",
+   "name": "Protected-path deny with canonical paths",
+   "statement": "With an accepted contract, any write or edit whose canonical project-relative path matches a protected glob, falls outside the root, or touches tests when the contract forbids test changes is denied before it runs at every rollout stage.",
+   "mechanism": "NormalizePath turns paths into project-relative slash paths and returns empty for anything outside the root, lexically (filepath.Rel plus Clean, no symlink resolution), and Protected matches doublestar globs (internal/contract/contract.go:249-304); PreCheck returns s3.protected_path at L3 with confidence 1.0 for produce-category paths (internal/detect/engine.go:1442-1452) and RolloutRoute always blocks ExplicitGuardrail rules (internal/policy/rollout.go:11-15, internal/policy/rollout.go:37-41); symlink-resolving canonicalization exists but is used for project identity only (internal/pathnorm/pathnorm.go:93-108).",
+   "refs": [
+    "internal/contract/contract.go:250",
+    "internal/contract/contract.go:294",
+    "internal/pathnorm/pathnorm.go:95",
+    "internal/detect/engine.go:1442",
+    "internal/detect/engine.go:1448",
+    "internal/policy/rollout.go:13",
+    "internal/policy/rollout.go:40"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "duplicate-of:vesperchant 3-tier hooks (PreToolUse risk gate)",
+   "verdict": "adopt",
+   "principle_fit": [
+    "P4",
+    "P8",
+    "Z1",
+    "Z2"
+   ],
+   "principle_conflict": [
+    "Z2: only write/edit tool paths are checked, so shell writes to protected paths pass",
+    "Z2: lexical normalization does not resolve an in-project symlink pointing at a protected file"
+   ],
+   "proof_purpose": "No agent tool call modified G1's protected set (both hooks.json files, G1 state, contract, pinned oracle files) through a write tool.",
+   "hook_mapping": "PreToolUse",
+   "g1_design": "G1's fail-closed PreToolUse denies write/edit tools whose symlink-resolved canonical target is in the protected set or outside the workspace, denies run_command calls whose text names a protected path, and re-hashes the protected set at Stop to catch any other write.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-12",
+   "name": "Test-weakening heuristics versus oracle-file pinning",
+   "statement": "Patches to pre-existing tests that remove tests or assertions, add skips or identity assertions, swap real targets for mocks, change test infrastructure, or source patches that add error-hiding constructs are flagged by regex counts, and some are denied before they land, but shell writes bypass all of it.",
+   "mechanism": "bypass() applies TestChange, MockSubstitution, HidingChange and answer-copy literal tracking to patch lines, exempting files created this session (internal/detect/engine.go:1068-1147, internal/detect/bypass.go:48-63, internal/detect/bypass.go:104-114); AssertionGuard counts assertions, identity assertions and skip markers and PreCheck denies blocked test patches and repeated hiding kinds (internal/detect/assertion_guard.go:46-60, internal/detect/engine.go:1426-1469); oracle-relevant names (conftest.py, pytest.ini, jest/vitest configs, manifests) are catalogued (internal/classify/classify.go:313-358); 9 cases are shared with the external iron-laws tool (internal/detect/detect_test.go:586).",
+   "refs": [
+    "internal/detect/engine.go:1068",
+    "internal/detect/bypass.go:48",
+    "internal/detect/bypass.go:104",
+    "internal/detect/assertion_guard.go:46",
+    "internal/detect/engine.go:1463",
+    "internal/classify/classify.go:313",
+    "internal/detect/detect_test.go:586",
+    "internal/detect/engine.go:1119"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adapt",
+   "principle_fit": [
+    "Z2",
+    "PH"
+   ],
+   "principle_conflict": [
+    "P4/Mathematics Placement: regex reading of patch text cannot sit in the authority path",
+    "Z2: sed -i, heredocs and other shell writes are not inspected"
+   ],
+   "proof_purpose": "Replaced in G1 by an exact fact: every contract-pinned oracle file (tests, test configs, conftest, fixtures) is byte-identical to its contracted digest.",
+   "hook_mapping": "PreToolUse",
+   "g1_design": "The contract lists oracle files (seeded from the name catalog plus explicit declarations) with SHA-256 digests; write tools to them are denied in PreToolUse and any digest change voids completion at Stop; the regexes survive only as measured warnings.",
+   "cost": "medium"
+  },
+  {
+   "id": "ASC-13",
+   "name": "Irreversible actions require a fresh passing receipt",
+   "statement": "A release, publish or tag-push command is gated on a passing check after the last code change and after any observed CI failure, and on a rate limit of 2 releases per hour, with command classification done by regex.",
+   "mechanism": "releaseCheck flags ci_failed, unverified_change, ui_timing and release_rate (internal/detect/release_guard.go:84-127) with reproduction rules for CI failures (internal/detect/release_guard.go:136-196); classify.Release ranks tag, push_tag and release/publish commands (internal/classify/scope.go:383-537); it runs in PreGuard before execution (internal/live/hooks.go:433).",
+   "refs": [
+    "internal/detect/release_guard.go:84",
+    "internal/detect/release_guard.go:98",
+    "internal/detect/release_guard.go:104",
+    "internal/detect/release_guard.go:119",
+    "internal/classify/scope.go:383",
+    "internal/detect/marathon_test.go:150"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P4",
+    "P5",
+    "Z2"
+   ],
+   "principle_conflict": [
+    "Mathematics Placement: command classification is a regex, acceptable only because a match can only add a deny"
+   ],
+   "proof_purpose": "No irreversible action left the machine without a passing G1 receipt bound to the current tree hash.",
+   "hook_mapping": "PreToolUse",
+   "g1_design": "G1 PreToolUse denies run_command calls the adapter classifies as publish/release/tag-push unless the latest G1 receipt passed and matches the current tree hash; classification stays in the agy adapter.",
+   "cost": "medium"
+  },
+  {
+   "id": "ASC-14",
+   "name": "Past the ceiling only reads are allowed",
+   "statement": "Once active time or fresh tokens exceed a configured or contracted ceiling, every call that is not read-only is denied before it runs, and only an explicit user extension lifts it.",
+   "mechanism": "ceilingCheck denies non-read calls with s8.session_ceiling at L3 (internal/detect/session_ceiling.go:99-121), an always-blocking guardrail (internal/policy/rollout.go:40); active time counts gaps up to 30 minutes (internal/detect/marathon.go:52-73) and tokens exclude cache reads (internal/detect/usage.go:47); parseExtend is user-only (internal/live/extend.go:14-74).",
+   "refs": [
+    "internal/detect/session_ceiling.go:99",
+    "internal/detect/session_ceiling.go:115",
+    "internal/detect/marathon.go:52",
+    "internal/policy/rollout.go:40",
+    "internal/live/extend.go:51",
+    "internal/detect/marathon_test.go:240"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "duplicate-of:T1 bounded loops (read-only degradation is new)",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P1",
+    "P8",
+    "Z7"
+   ],
+   "principle_conflict": [
+    "P6: only a manual extend lifts the ceiling",
+    "Mathematics Placement: effort is not a G1 variable, so only a contract-declared hard limit qualifies"
+   ],
+   "proof_purpose": "No mutation happened after the contract's declared budget was exhausted.",
+   "hook_mapping": "PreToolUse",
+   "g1_design": "If a contract declares a hard limit (for example a maximum number of G1 Stop continuations or verifications), G1 enforces it as a deterministic deny of mutating tools; there is no in-session extension, only a new contract hash.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-15",
+   "name": "Observation gaps poison completion",
+   "statement": "Any event the harness failed to process (queue overflow, worker panic, storage error) increments a sticky, monotone, persisted gap counter, and while it is non-zero no intervention is emitted, no checks run, criteria count as unmet and no receipt is issued.",
+   "mechanism": "enqueue never blocks and counts rejections; panics count too (internal/live/session.go:657-681); observation_gap is MAX-merged and cannot be cleared (internal/ledger/observation.go:8-25); handleHook emits nothing on a gap (internal/live/hooks.go:80-82); checkpoint and criteria refuse (internal/live/session.go:769-772, internal/live/session.go:855-857); the audit parser stops judging when more than 3 tool calls are unpaired and pairing is below 95% (internal/analyze/analyze.go:165-173).",
+   "refs": [
+    "internal/live/session.go:657",
+    "internal/ledger/observation.go:19",
+    "internal/live/hooks.go:80",
+    "internal/live/session.go:769",
+    "internal/live/session.go:855",
+    "internal/analyze/analyze.go:165",
+    "internal/live/queue_test.go:40"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adopt",
+   "principle_fit": [
+    "P3",
+    "P4",
+    "Z7",
+    "TW"
+   ],
+   "principle_conflict": [
+    "Z7: samcheonpo's gap also suppresses protected-path and budget denies (internal/live/hooks.go:80-82); G1 must keep guardrails on during a gap"
+   ],
+   "proof_purpose": "G1 observed every tool step of the task: stepIdx is contiguous, every PreToolUse has a PostToolUse or a transcript result, and every hook run journaled start and finish.",
+   "hook_mapping": "Stop",
+   "g1_design": "G1 keeps a monotone per-task gap counter fed by stepIdx contiguity, Pre/Post pairing and transcript parse failures; any gap makes completion fail closed, while PreToolUse guardrail denies stay active regardless.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-16",
+   "name": "Unknown is a third state, never pass",
+   "statement": "Every measured or verified field is tri-state: missing usage, prices, quota or checks stay unknown instead of becoming zero or pass, deferred judgments carry a named reason, and tool calls without a result are recorded as not executed.",
+   "mechanism": "Quota needs both used_percent and window_minutes and a malformed value clears the old one (internal/adapter/codex/quota.go:10-27); unpriced models stay priced=false and nullable totals (internal/cost/measurement.go:50-135, internal/receipt/receipt.go:89-95); reliability rules increment Deferred with a reason when facts are incomplete (internal/detect/progress_stall.go:58-62, internal/detect/reliability.go:141-143); calls without a post hook are flushed with exit -1 and blocked calls get -1 (internal/live/hooks.go:355-371, internal/live/hooks.go:524).",
+   "refs": [
+    "internal/adapter/codex/quota.go:10",
+    "internal/cost/measurement.go:50",
+    "internal/receipt/receipt.go:89",
+    "internal/detect/progress_stall.go:61",
+    "internal/live/hooks.go:365",
+    "internal/live/hooks.go:524",
+    "internal/receipt/action_test.go:15"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adopt",
+   "principle_fit": [
+    "P3",
+    "P4",
+    "Z4",
+    "Z7"
+   ],
+   "principle_conflict": [],
+   "proof_purpose": "A completion predicate is evaluated only over known facts; unknown never satisfies it.",
+   "hook_mapping": "Stop",
+   "g1_design": "G1's ledger stores every criterion result and every tool call as tri-state (pass/fail/unknown; executed/denied/unknown) with a reason code; the completion gate treats unknown as fail and the control layer treats it as non-progress.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-17",
+   "name": "Evidence-basis table decides who may deny",
+   "statement": "Rules are classed by evidence: user-set limits (protected path, budget, ceiling) always block, rules backed by observable facts may escalate without a contract, rules judging scope, completion or ratios need an accepted contract, and estimated or model-judged rules never block.",
+   "mechanism": "policy.Escalable is an explicit switch over rule ids and pattern kinds (internal/policy/rollout.go:59-83); AdviceOnly caps two estimate rules (internal/policy/rollout.go:32-35); ExplicitGuardrail rules block in every mode (internal/policy/rollout.go:11-15, internal/policy/rollout.go:37-41); Decide downgrades a block to advice or observe when the host cannot block (internal/policy/policy.go:13-29).",
+   "refs": [
+    "internal/policy/rollout.go:63",
+    "internal/policy/rollout.go:68",
+    "internal/policy/rollout.go:78",
+    "internal/policy/rollout.go:33",
+    "internal/policy/rollout.go:40",
+    "internal/policy/policy.go:13"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adopt",
+   "principle_fit": [
+    "P4",
+    "P8",
+    "Z7"
+   ],
+   "principle_conflict": [],
+   "proof_purpose": "Every deny G1 issues is traceable to a mechanism whose evidence class is a G1-produced deterministic fact.",
+   "hook_mapping": "n/a",
+   "g1_design": "G1 keeps a static table mapping each mechanism to its evidence class (G1-run check, exact hash, host payload, heuristic); PreToolUse denies and Stop continuations may use only the first two classes, enforced by a unit test over the table.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-18",
+   "name": "Rule authority bound to an evaluation digest",
+   "statement": "A heuristic rule can only block in 'validated' mode when the operator declared, in the user config, a 32-byte SHA-256 digest of the evaluation report justifying it; nothing is pre-approved and the project config can only drop such digests.",
+   "mechanism": "RolloutRoute hex-decodes evidence[rule] and requires 32 bytes (internal/policy/rollout.go:8-30); a project digest survives only if it equals the user's (internal/config/config.go:345-349); the report template defines shadow, recommend and validated stages (docs/benchmarks/report-template.md:44-50).",
+   "refs": [
+    "internal/policy/rollout.go:11",
+    "internal/policy/rollout.go:25",
+    "internal/config/config.go:345",
+    "docs/benchmarks/report-template.md:48"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P8",
+    "Z7"
+   ],
+   "principle_conflict": [
+    "Z6: only the digest's format is checked; nothing verifies the report"
+   ],
+   "proof_purpose": "A rule's or injected variant's promotion is bound to the exact measurement artifact that justified it.",
+   "hook_mapping": "outside-hooks",
+   "g1_design": "Any G1 rule or injection variant promoted from experiment to default must reference the SHA-256 of an A/B result file in G1 state; G1 verifies the file exists, hashes equal, and its recorded interval clears the threshold before loading the rule.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-19",
+   "name": "Regex rule data with pinned test vectors",
+   "statement": "Every regex list the harness loads (verify commands, failed-test patterns, forced-continue prompts) ships with must-match and must-not-match cases, and a list that fails its own cases is not loaded.",
+   "mechanism": "default.yml pairs each pattern list with cases.match and cases.no_match (internal/rules/default.yml:1-33); rules.go checks every list and ignores a user file that fails its cases (internal/rules/rules.go:81-108, internal/rules/rules.go:156-159).",
+   "refs": [
+    "internal/rules/default.yml:3",
+    "internal/rules/default.yml:31",
+    "internal/rules/rules.go:83",
+    "internal/rules/rules.go:156",
+    "internal/rules/rules_test.go:9"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adopt",
+   "principle_fit": [
+    "P8",
+    "Z7"
+   ],
+   "principle_conflict": [],
+   "proof_purpose": "Each text matcher G1 uses (transcript exit-code parser, request extraction, adapter tool classification) passes its pinned vectors at load time.",
+   "hook_mapping": "outside-hooks",
+   "g1_design": "Every regex in G1's agy adapter is stored with positive and negative fixtures from captured agy 1.1.27 transcripts; a failing vector makes PreToolUse deny and injection hooks emit nothing.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-20",
+   "name": "Layered config where the workspace can only weaken",
+   "statement": "Project settings merge on top of user settings under a lattice that lets the repository only lower blocking (mode down to shadow, block cap down to 0) and only turn off egress, judges and experiments, which means an agent-writable file can disarm interventions for the next session.",
+   "mechanism": "Load merges defaults, ~/.samcheonpo/config.yml and .samcheonpo.yml (internal/config/config.go:253-365); rank drops the mode and EscalateMaxBlocks can only go down (internal/config/config.go:329-335); loosenOnly lets thresholds only loosen (internal/config/config.go:371-464); unknown YAML keys are silently ignored (internal/config/config.go:282).",
+   "refs": [
+    "internal/config/config.go:253",
+    "internal/config/config.go:329",
+    "internal/config/config.go:333",
+    "internal/config/config.go:371",
+    "internal/config/config.go:282",
+    "internal/config/rollout_test.go:11"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P7",
+    "Z6"
+   ],
+   "principle_conflict": [
+    "Z1: the direction is inverted for G1; the agent-writable workspace layer must only add denies, never relax them"
+   ],
+   "proof_purpose": "The effective policy is no weaker than the global root-of-trust policy.",
+   "hook_mapping": "SessionStart",
+   "g1_design": "G1 merges ~/.gemini/config/hooks.json (root of trust) with .agents/hooks.json so the workspace can only add denies and tighten limits, uses strict decoding, and hashes the merged policy into receipts; since both layers run and a deny from either wins, G1 also verifies at SessionStart that its global group is byte-identical to the installed record.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-21",
+   "name": "Evidence key where empty means unknown",
+   "statement": "Check evidence is keyed by task, revision, check id, command hash, input hash, environment hash, runner version and the accepted contract's authority hash; any empty component makes the key invalid rather than a wildcard, and a past pass is only a candidate until a freshly recomputed key matches.",
+   "mechanism": "Key.Valid and Validate (internal/verification/evidence.go:17-72) with Reusable rejecting mismatch, expiry, clock regression, manual, flaky, failed, partial, side-effect or timed-out evidence (internal/verification/evidence.go:74-94); proofKeyContext hashes the sorted daemon environment and declared env files (internal/live/checkpoint.go:110-131); inputs are fingerprinted root-confined, without following links, bounded to 10,000 files and 64 MiB, failing closed on change during read (internal/verification/fingerprint.go:19-118); PlanChecks yields candidate/reusable/invalidated/manual states (internal/verification/planner.go:32-63).",
+   "refs": [
+    "internal/verification/evidence.go:17",
+    "internal/verification/evidence.go:74",
+    "internal/live/checkpoint.go:126",
+    "internal/verification/fingerprint.go:44",
+    "internal/verification/fingerprint.go:108",
+    "internal/verification/planner.go:61",
+    "internal/verification/evidence_test.go:12"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "duplicate-of:T1 completion gate binding receipt hash, source, tree and output digests (adds env digest, runner version and empty-is-unknown)",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P4",
+    "P5",
+    "Z5",
+    "Z7"
+   ],
+   "principle_conflict": [
+    "P5: fp.Hash truncates SHA-256 to 128 bits (internal/fp/fp.go:18-28)",
+    "Z7: the environment digest covers the daemon's environment, which is not scrubbed"
+   ],
+   "proof_purpose": "This pass was observed for exactly this contract, revision, command, input bytes, scrubbed environment and runner.",
+   "hook_mapping": "Stop",
+   "g1_design": "G1's receipt key is a full SHA-256 over contract hash, criterion id, command, tree id, input digests, scrubbed-environment digest and runner version; an empty component means not reusable, and the default at completion is always to re-run.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-22",
+   "name": "Pass needs exit 0, full output, unchanged tree",
+   "statement": "A harness check passes only with exit 0, no timeout, combined output under the 1 MiB capture cap, and an unchanged workspace tree fingerprint across the run; a changed tree marks the check as a side effect that can never pass.",
+   "mechanism": "Pass = code==0 && !timedOut && !truncated (internal/live/checkpoint.go:212) with limitWriter capping output (internal/live/checkpoint.go:239-240); the tree is fingerprinted before and after via a copied git index plus write-tree excluding .samcheonpo, or a hashed walk (internal/live/checkpoint.go:200-205, internal/live/checkpoint.go:218-225, internal/live/ws.go:140-182); side-effect checks are appended to the acceptance and skipped thereafter (internal/live/session.go:814-817).",
+   "refs": [
+    "internal/live/checkpoint.go:212",
+    "internal/live/checkpoint.go:239",
+    "internal/live/checkpoint.go:218",
+    "internal/live/ws.go:140",
+    "internal/live/ws.go:165",
+    "internal/live/session.go:814",
+    "internal/live/live_test.go:735"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adopt",
+   "principle_fit": [
+    "P4",
+    "P5",
+    "Z4",
+    "Z7"
+   ],
+   "principle_conflict": [
+    "Z1: a concurrent agent write during a check marks it side-effect and silently removes it from the Stop gate; gitignored files and .samcheonpo/ are invisible to the fingerprint"
+   ],
+   "proof_purpose": "The receipt verdict was computed from complete output within the time limit, and the verification did not mutate the tree it certifies.",
+   "hook_mapping": "Stop",
+   "g1_design": "G1 receipts carry exit code, timeout flag, output byte count, truncation flag and before/after tree ids inside the receipt digest; truncated, timed-out or tree-changing runs are FAIL, and dropping a criterion requires a new contract hash, never an automatic skip.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-23",
+   "name": "Checks run in a detached worktree snapshot",
+   "statement": "Worktree-isolated checks run in a detached git worktree built from 'git stash create' (or HEAD) plus copied untracked, non-ignored files, so they see current edits without touching the project.",
+   "mechanism": "worktree() uses gitStashCommit, git worktree add --detach and copies ls-files --others --exclude-standard, then removes it (internal/live/checkpoint.go:297-341, internal/live/ws.go:359-387); mid-work runs are limited to worktree or pure checks and skipped while the agent's shell is busy (internal/live/checkpoint.go:89-95).",
+   "refs": [
+    "internal/live/checkpoint.go:297",
+    "internal/live/checkpoint.go:312",
+    "internal/live/checkpoint.go:322",
+    "internal/live/ws.go:359",
+    "internal/live/checkpoint.go:92",
+    "internal/live/live_test.go:735"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P4",
+    "P2",
+    "Z2"
+   ],
+   "principle_conflict": [
+    "Z7: ignored inputs are not copied and the environment is not scrubbed (internal/live/verification_plan.go:80)",
+    "git runs inside the agent-controlled repository, so repo-local git config (fsmonitor, filters) applies"
+   ],
+   "proof_purpose": "Verification ran against an immutable snapshot whose commit or tree id equals the certified state.",
+   "hook_mapping": "Stop",
+   "g1_design": "G1 verifies in a detached worktree of a snapshot commit (write-tree plus commit-tree), runs git with hardened options (no fsmonitor, filters or system config), uses a scrubbed environment, and records the snapshot id in the receipt.",
+   "cost": "medium"
+  },
+  {
+   "id": "ASC-24",
+   "name": "Process-group kill with bounded pipe wait",
+   "statement": "Checks run in their own process group (a Job Object attached while suspended on Windows), the whole group is SIGKILLed on timeout, and a 2-second WaitDelay keeps orphans that hold the output pipe from hanging the check.",
+   "mechanism": "procgroup.Start sets Setpgid and Kill signals the group (internal/procgroup/procgroup_unix.go:19-34); Windows uses a suspended start plus Job Object (internal/procgroup/procgroup_windows.go:52-115); runGroup sets WaitDelay and kills on deadline (internal/live/checkpoint.go:231-270).",
+   "refs": [
+    "internal/procgroup/procgroup_unix.go:19",
+    "internal/procgroup/procgroup_windows.go:52",
+    "internal/live/checkpoint.go:244",
+    "internal/live/checkpoint.go:265",
+    "internal/live/live_test.go:693",
+    "internal/live/checkpoint_group_test.go:10"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "duplicate-of:T1 process-tree reaping",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P4"
+   ],
+   "principle_conflict": [
+    "Z7: setsid or double-fork escapes a Unix process group"
+   ],
+   "proof_purpose": "No verification process outlives its receipt, and a stuck descendant cannot push the Stop hook past agy's timeout.",
+   "hook_mapping": "Stop",
+   "g1_design": "Keep T1's process-tree reaping and add a WaitDelay-style bound on pipe draining so the Stop hook always finishes inside agy's timeout.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-25",
+   "name": "Session identity bound to agent and workspace",
+   "statement": "Session ids must be path-safe and bound to one agent and one project, late hooks cannot resurrect an ended session, and the same id from another agent or project is rejected.",
+   "mechanism": "session() validates ids and project binding (internal/live/session.go:147-159, internal/live/daemon.go:406-418); only SessionStart may reopen an ended id (internal/live/hooks.go:148-153); cross-agent id reuse is refused at save (internal/ledger/ledger.go:156-158).",
+   "refs": [
+    "internal/live/daemon.go:406",
+    "internal/live/hooks.go:148",
+    "internal/ledger/ledger.go:156",
+    "internal/live/identity_boundary_test.go:10"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adopt",
+   "principle_fit": [
+    "Z1",
+    "Z5",
+    "P3"
+   ],
+   "principle_conflict": [],
+   "proof_purpose": "Event E belongs to conversation C bound to workspace W.",
+   "hook_mapping": "PreToolUse",
+   "g1_design": "G1 validates conversationId as a safe path component before using it, binds it to workspacePaths[0] at first sight, and refuses (deny for PreToolUse, ignore elsewhere) events whose workspace differs.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-26",
+   "name": "Deterministic, replayable detector state",
+   "statement": "All S1-S8 detectors are a pure fold over the ordered event sequence with time only from event timestamps, restarts replay stored facts idempotently without issuing new verdicts, and incremental totals are property-tested to equal a full rescan.",
+   "mechanism": "Engine.Observe dispatches each event into per-detector state and combine() (internal/detect/engine.go:1-3, internal/detect/engine.go:286-321); reliability facts are deduplicated by hash(session, call or source ref, phase) and Restoring suppresses verdicts (internal/detect/reliability.go:137-158, internal/detect/reliability.go:218-231, internal/detect/engine.go:317-319); restoreHistory replays stored events (internal/live/restore.go:17-61); usage_test checks incremental equals rescan over 500 random events (internal/detect/usage_test.go:37).",
+   "refs": [
+    "internal/detect/engine.go:1",
+    "internal/detect/engine.go:287",
+    "internal/detect/reliability.go:145",
+    "internal/detect/engine.go:317",
+    "internal/live/restore.go:17",
+    "internal/detect/usage_test.go:37",
+    "internal/detect/detect_test.go:522"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P1",
+    "P3",
+    "P8",
+    "TW"
+   ],
+   "principle_conflict": [
+    "Z5: several inputs (error fingerprints, failed-test names) are parsed from tool output"
+   ],
+   "proof_purpose": "Control state is a pure, idempotent function of the G1 fact log, so any fresh hook process or agent recomputes the same Stop-continuation decision.",
+   "hook_mapping": "Stop",
+   "g1_design": "G1 computes its control vector (pass/fail vector, displacement, revisits) as a pure fold over ledger facts keyed by (conversationId, stepIdx, phase) on every hook invocation, with a property test that incremental and full recomputation agree.",
+   "cost": "medium"
+  },
+  {
+   "id": "ASC-27",
+   "name": "Progress means the failing set strictly shrinks",
+   "statement": "Progress is a pass, or a strict-subset shrink of failing tests or error fingerprints on a comparable harness-run check (same check, command hash and environment hash); repeated non-shrinking failures across changed inputs are a stall, and failure keys that keep changing without shrinking are whack-a-mole.",
+   "mechanism": "relatedImprovement requires a strict subset (internal/detect/progress_stall.go:27-39); a series resets when command or environment hash changes and a stall needs at least 3 failures, 5 tool events and 2 distinct input hashes (internal/detect/progress_stall.go:64-75, internal/detect/progress_stall.go:100); the engine's verifyProgress and whackAMole implement the same idea over agent-run checks (internal/detect/engine.go:751-781, internal/detect/engine.go:550-579); a background run of pure/worktree checks every 5 writes feeds it (internal/live/session.go:443-448).",
+   "refs": [
+    "internal/detect/progress_stall.go:27",
+    "internal/detect/progress_stall.go:67",
+    "internal/detect/progress_stall.go:100",
+    "internal/detect/engine.go:751",
+    "internal/detect/engine.go:564",
+    "internal/live/session.go:445",
+    "internal/detect/reliability_test.go:163"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "duplicate-of:T1 stagnation and oscillation detection (adds the strict-subset definition and comparability key)",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P4",
+    "P8",
+    "PH"
+   ],
+   "principle_conflict": [
+    "Z2: the engine version also counts line growth, which is agent output",
+    "Mathematics Placement: thresholds 3/5/2 are unexplained constants"
+   ],
+   "proof_purpose": "Per-turn displacement: the Hamming distance of G1's acceptance vector decreased, or the failing set is a strict subset of the previous one.",
+   "hook_mapping": "Stop",
+   "g1_design": "G1's Stop controller compares the current pass/fail vector of its own checks with the previous receipt; it continues only while the failing set strictly shrinks within k continuations, and stops on zero displacement or a revisit.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-28",
+   "name": "Failure invariant across distinct trees",
+   "statement": "When the same normalized failure (error fingerprint, failing-test name, or whole result fingerprint) survives edits that changed the workspace, the edits are not moving the failing criterion, which samcheonpo escalates at 3, 5 and 8 distinct-tree attempts.",
+   "mechanism": "errStreak counts only when WSBefore differs (internal/detect/engine.go:456-512, internal/config/config.go:222); verifier_deadlock 'repeat' fires when the same ResultFP repeats with edits in between (internal/detect/verifier_deadlock.go:43-60); error fingerprints mask times, long strings, paths, hex and numbers and keep 3 frames (internal/fp/errfp.go:20-22, internal/fp/errfp.go:57-76); ResultFP hashes exit code plus sorted error and test sets (internal/fp/fp.go:275-285).",
+   "refs": [
+    "internal/detect/engine.go:476",
+    "internal/config/config.go:222",
+    "internal/detect/verifier_deadlock.go:49",
+    "internal/fp/errfp.go:57",
+    "internal/fp/fp.go:275",
+    "internal/fp/fp_test.go:55"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "duplicate-of:T1 stagnation and oscillation detection",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P8",
+    "PH"
+   ],
+   "principle_conflict": [
+    "Mathematics Placement: error templating is heuristic normalization; usable only in control"
+   ],
+   "proof_purpose": "Nonzero tree displacement produced zero result displacement on a G1-run check.",
+   "hook_mapping": "Stop",
+   "g1_design": "G1 computes result digests only from its own check runs; if the digest of a failing criterion is unchanged across k distinct tree hashes, the controller stops issuing Stop continuations.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-29",
+   "name": "Execution identity with a certainty flag",
+   "statement": "Two shell runs are the same execution only if a hash over effective directory, sorted env assignments, timeout wrapper and normalized command matches, and any opaque construct ($ substitution, backticks, command lists, cd/export/source, out-of-project directory) marks the identity uncertain and never blockable.",
+   "mechanism": "ExecFP builds Hash('exec/2', dir, env, wrappers, norm) and sets certain=false on opaque constructs (internal/fp/fp.go:31-112); blockableRun requires a certain exec fingerprint (internal/detect/engine.go:411); identical reruns also need equal workspace and result fingerprints (internal/detect/engine.go:424-454).",
+   "refs": [
+    "internal/fp/fp.go:53",
+    "internal/fp/fp.go:111",
+    "internal/detect/engine.go:411",
+    "internal/detect/engine.go:426",
+    "internal/fp/fp_test.go:110"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adapt",
+   "principle_fit": [
+    "Z5",
+    "P8"
+   ],
+   "principle_conflict": [
+    "PH: in samcheonpo it serves efficiency blocking"
+   ],
+   "proof_purpose": "This command is execution-identical to an earlier one, or G1 cannot know and therefore claims nothing.",
+   "hook_mapping": "Stop",
+   "g1_design": "G1 uses exec identity plus tree hash plus result digest only as a zero-displacement input to the Stop controller; an uncertain identity never counts as a repeat.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-30",
+   "name": "Workspace revisits an earlier content state",
+   "statement": "A write whose content hash equals an earlier non-latest hash of the same file, or an edit that exactly reverses an earlier edit, is an edit-and-revert loop reported with the reverted writes as evidence.",
+   "mechanism": "oscillation() keeps per-path write-hash history (skipping edit:/patch: pseudo-hashes) and per-path edit pairs, and raiseOsc() collects the writes between the restored state and now (internal/detect/engine.go:879-923); s2.oscillation is fact-backed and may escalate without a contract (internal/policy/rollout.go:68).",
+   "refs": [
+    "internal/detect/engine.go:879",
+    "internal/detect/engine.go:891",
+    "internal/detect/engine.go:902",
+    "internal/detect/engine.go:911",
+    "internal/policy/rollout.go:68"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "duplicate-of:T1 stagnation and oscillation detection (file-content variant)",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P4",
+    "P8",
+    "PH"
+   ],
+   "principle_conflict": [
+    "Z5: agy edit tools do not expose replacement chunks, so only full writes are hashable on agy (internal/live/agy.go:154-157)"
+   ],
+   "proof_purpose": "The workspace returned to a previously observed state: a revisit in state space.",
+   "hook_mapping": "Stop",
+   "g1_design": "G1 hashes the whole tracked tree itself at each turn boundary (not per-file agent-reported writes) and treats a revisit of an earlier tree hash with an equal acceptance vector as oscillation that ends Stop continuations.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-31",
+   "name": "Count forced continuations without progress",
+   "statement": "Prompts injected by auto-continue tools (Stop-hook feedback, todo continuation, ralph loops) are recognized, excluded from user intent, and three forced turns without a progress event raise an L2 finding.",
+   "mechanism": "onPrompt marks ev.Forced from rules.ForcedPrompts (internal/live/hooks.go:258, internal/rules/default.yml:24-33) and skips intent recording (internal/live/hooks.go:281-283); forcedTurn raises s8.forced_no_progress at 3 and progress resets it (internal/detect/engine.go:1268-1276, internal/detect/engine.go:779-780); monotone persisted counters with reserve-before-act exist for judge budgets (internal/ledger/judge_budget.go:55-62).",
+   "refs": [
+    "internal/live/hooks.go:258",
+    "internal/rules/default.yml:27",
+    "internal/live/hooks.go:281",
+    "internal/detect/engine.go:1272",
+    "internal/ledger/judge_budget.go:55"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "duplicate-of:T1 bounded loops + stagnation detection",
+   "verdict": "adapt",
+   "principle_fit": [
+    "PH",
+    "P8",
+    "P4",
+    "P3"
+   ],
+   "principle_conflict": [
+    "Z5: samcheonpo recognizes forced prompts by text; G1 issues its own continues and knows them exactly"
+   ],
+   "proof_purpose": "k consecutive G1-issued continuations produced no displacement, so another continuation is unjustified.",
+   "hook_mapping": "Stop",
+   "g1_design": "G1 persists a per-task continuation counter (incremented and written before it emits continue, never decreased) together with the displacement of each continued turn, and stops continuing after k zero-displacement continuations, well below agy's cap of 10.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-32",
+   "name": "Outside-the-code failure classification",
+   "statement": "One ordered table reads exit codes and output phrases to classify a failure as transient, external (missing dependency or command, DNS, refused connection, permission, port, auth, disk), UI timing or code, and two identical external failures on an unchanged workspace freeze source edits with a suggested human remedy.",
+   "mechanism": "DiagnoseFailure checks 126/127 first, then an ordered substring table, UI-timing and code signals (internal/fp/failclass.go:86-180); environment() needs 2 external or 4 transient repeats per (class, run) with unchanged WSBefore and sets a freeze (internal/detect/engine.go:661-724); frozenWrite denies write/edit tools except manifests and .samcheonpo (internal/detect/engine.go:733-749); the recovery oracle shares the table (internal/recovery/oracle.go:61-76).",
+   "refs": [
+    "internal/fp/failclass.go:86",
+    "internal/fp/failclass.go:132",
+    "internal/fp/failclass.go:154",
+    "internal/detect/engine.go:689",
+    "internal/detect/engine.go:736",
+    "internal/recovery/oracle.go:61",
+    "internal/detect/freeze_test.go:19"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "research",
+   "principle_fit": [
+    "PH"
+   ],
+   "principle_conflict": [
+    "Z4/Z5: substring heuristics over untrusted output; remedy commands interpolate output-derived text",
+    "P2: the freeze denies native edits on a heuristic diagnosis and is bypassed by shell writes"
+   ],
+   "proof_purpose": "Control only: G1's own check failed twice at the same tree hash for a reason code edits cannot fix, so further continuations are futile.",
+   "hook_mapping": "Stop",
+   "g1_design": "If adopted, classify only the stderr tail of G1-run checks, use the class only to stop Stop continuations and record 'needs-human' in G1 state, and never generate, display or run remedy commands.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-33",
+   "name": "Unchanged tree hash is not unchanged environment",
+   "statement": "Because a workspace fingerprint cannot see a service coming back or a package being installed elsewhere, one rerun is always allowed per (cause, command) after an external or transient failure.",
+   "mechanism": "recoveryCheck() grants a single pass keyed class|runID, consumed on use and reset by a success (internal/detect/engine.go:1473-1491, internal/detect/engine.go:679-683).",
+   "refs": [
+    "internal/detect/engine.go:1479",
+    "internal/detect/engine.go:1486",
+    "internal/detect/engine.go:679",
+    "internal/live/live_test.go:1279"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adapt",
+   "principle_fit": [
+    "Z7",
+    "P8"
+   ],
+   "principle_conflict": [],
+   "proof_purpose": "Documents the limit of tree-hash evidence: an unchanged tree hash does not prove an unchanged environment.",
+   "hook_mapping": "Stop",
+   "g1_design": "Make G1's revisit detector key states by (tree hash, environment epoch) and treat an environment-class failure as unknown displacement rather than zero displacement, so the Stop controller does not stop on a state that may have changed outside the tree.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-34",
+   "name": "Scope from contract globs, never from prompt text",
+   "statement": "Writes outside an accepted contract's allow globs are deterministic out-of-scope findings, while without a contract the scope is guessed from path tokens in the request (minus negated lines) and every such finding is an estimate that never blocks.",
+   "mechanism": "inScope uses the contract's doublestar scope when known, else GuessScope over the first prompt (internal/detect/engine.go:787-801, internal/detect/engine.go:235-280); guessedScope drops lines with negative words and is documented as never authority (internal/detect/scope_context.go:13-53); guessedOut records the first write at L0, advises the second at confidence 0.55 and flags a return to the previous revision's scope after compaction (internal/detect/engine.go:980-1005).",
+   "refs": [
+    "internal/detect/engine.go:787",
+    "internal/detect/engine.go:249",
+    "internal/detect/scope_context.go:13",
+    "internal/detect/engine.go:984",
+    "internal/detect/engine.go:990",
+    "internal/detect/scope_context_test.go:28"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P4",
+    "Z2"
+   ],
+   "principle_conflict": [
+    "Z3/Z6/P3: a prompt is not state; reject the guessed half"
+   ],
+   "proof_purpose": "Every path in the final tree diff lies inside the contract's declared scope.",
+   "hook_mapping": "Stop",
+   "g1_design": "Keep only the contract half: the immutable contract carries allow/protect globs; G1 checks write-tool targets in PreToolUse and re-checks the final tree diff against the globs at completion (catching shell writes).",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-35",
+   "name": "Durable failed-edit memory per revision",
+   "statement": "Edits made since the last verification are fingerprinted and stored with the failure fingerprint when that verification fails, persist across sessions and agents of the same task revision, and re-applying an already-failed edit is flagged before it is written.",
+   "mechanism": "editFP = H('edit/1', path, trimmed added and removed lines) (internal/live/attempts.go:21-36); SaveFailedAttempts writes (task, revision, edit_fp, failure_fp) once (internal/live/attempts.go:54-86, internal/ledger/attempt.go:21-38, internal/ledger/migrations/0007_failed_attempt.sql:1-12); attemptPre raises s2.attempt_repeat at PreToolUse, advice-only by default (internal/live/attempts.go:110-123, internal/live/hooks.go:425-429).",
+   "refs": [
+    "internal/live/attempts.go:21",
+    "internal/live/attempts.go:54",
+    "internal/live/attempts.go:110",
+    "internal/ledger/attempt.go:21",
+    "internal/ledger/migrations/0007_failed_attempt.sql:1",
+    "internal/live/attempts_test.go:24"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P1",
+    "P3",
+    "PH",
+    "TW"
+   ],
+   "principle_conflict": [
+    "Z5: the failure link relies on heuristically classified agent-run verifications",
+    "agy edit tools carry no patch, so editFP is empty for replace_file_content"
+   ],
+   "proof_purpose": "This exact edit on this exact tree was already followed by a failing G1 receipt in this revision.",
+   "hook_mapping": "SessionStart",
+   "g1_design": "G1 links edit digests (from its own pre/post file hashes) only to its own failing receipts and injects the list of failed approaches at SessionStart/PreInvocation, so a fresh agent does not repeat them; an exact repeat on an identical tree may be denied in PreToolUse.",
+   "cost": "medium"
+  },
+  {
+   "id": "ASC-36",
+   "name": "Bounded state projection after context loss",
+   "statement": "After a compaction the next injectable response carries one bounded line restating goal, protected and allowed paths, budget and passed/total checks, and the goal card and four-state status label are derived only from harness evidence and explicitly grant nothing.",
+   "mechanism": "FormatAnchorHeader caps the [SAMCHEONPO ANCHOR] line at 150 bytes with priority segments (internal/hookclient/anchor.go:9-65) and takeAnchor emits it once after compaction (internal/live/anchor.go:9-55, internal/live/session.go:687-692); the goal card reports accepted_contract only when hashes match (internal/intent/card.go:32-124); stateLabel is Unknown on any gap and On track only with evidence (internal/live/session.go:880-898); the memory-rot detector (2 of: 2+ compactions, 25% re-reads, any revisit) only advises (internal/detect/engine.go:1246-1266).",
+   "refs": [
+    "internal/hookclient/anchor.go:16",
+    "internal/live/anchor.go:43",
+    "internal/intent/card.go:45",
+    "internal/live/session.go:880",
+    "internal/detect/engine.go:1261",
+    "internal/live/anchor_test.go:13"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "duplicate-of:vesperchant 3-tier hooks (PreInvocation ground-truth injection)",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P1",
+    "P3",
+    "TW",
+    "PH"
+   ],
+   "principle_conflict": [
+    "Z5: ParseAnchorHeader accepts the tag anywhere in text and SKILL.md tells the agent to adopt any ANCHOR line, so a forged anchor in tool output could steer the agent (internal/hookclient/anchor.go:74)"
+   ],
+   "proof_purpose": "None (projection); it makes model memory irrelevant by restating G1 facts.",
+   "hook_mapping": "SessionStart",
+   "g1_design": "agy has no compaction event, so G1 injects a bounded, ledger-derived projection (task id, contract-hash prefix, failing criteria, last receipt digest) at SessionStart and the first PreInvocation of each turn, labeled as projection, and never tells the agent to trust anchor-like text found elsewhere.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-37",
+   "name": "Completion-claim regex as measurement only",
+   "statement": "When the final assistant message matches a completion-claim regex and the session wrote code, the claim is compared with the latest verification: a failed live checkpoint or failing last run is L2, a run older than the last code write is L1 (stale), and no run at all is recorded only.",
+   "mechanism": "TurnEnd() applies the four cases (internal/detect/engine.go:1346-1378); IsCompletionClaim() scans only the last 1200 characters with a Korean/English regex and treats any honest-failure phrase anywhere as no claim (internal/detect/bypass.go:138-154); bench scenarios pin fires/not_fires (bench/scenarios/s5-false-done-failed/scenario.yml:11-13, bench/scenarios/s5-honest-failure/scenario.yml:11-14).",
+   "refs": [
+    "internal/detect/engine.go:1350",
+    "internal/detect/engine.go:1364",
+    "internal/detect/engine.go:1373",
+    "internal/detect/bypass.go:138",
+    "internal/detect/bypass.go:143",
+    "bench/scenarios/s5-false-done-failed/scenario.yml:11"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adapt",
+   "principle_fit": [
+    "PH",
+    "Z4"
+   ],
+   "principle_conflict": [
+    "Z4: reads the agent's claim text; G1 never conditions completion on what the agent says",
+    "P4: regex claim detection is heuristic",
+    "quality: 'Fixed the failing test. Done.' is vetoed by the honesty regex, and the 1200-byte slice can split UTF-8 (internal/detect/bypass.go:139-152)"
+   ],
+   "proof_purpose": "Measurement only: the rate at which the model claims DONE while G1's receipt says not done (G1 measured 3 of 8).",
+   "hook_mapping": "Stop",
+   "g1_design": "Completion authority ignores the message; a claim regex runs only in measurement to count false-DONE claims per configuration, reported with a confidence interval.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-38",
+   "name": "agy output: deny, continue, inject or nothing",
+   "statement": "For agy a pass or any client failure prints nothing so the call stays in agy's own permission flow, a deny becomes {\"decision\":\"deny\",\"reason\"}, a stop refusal becomes {\"decision\":\"continue\",\"reason\"}, and advice becomes a PreInvocation injectSteps ephemeralMessage, so neither 'allow' nor '{}' is ever emitted.",
+   "mechanism": "agyOut() maps Claude-dialect answers (internal/live/agy.go:281-305) and marshalOrNil() returns nil for an empty map, so '{}' is never printed (internal/live/dialect.go:181-193); TestAgyStaysInPermissionFlow pins all three mappings (internal/live/dialect_test.go:64-77). failClosedAllow returns an explicit allow only for Cursor, never for agy (internal/hookclient/hookclient.go:74-85); TestClientExplicitAllowWhenDaemonDown asserts empty stdout for agy (internal/live/dialect_test.go:109-128).",
+   "refs": [
+    "internal/live/agy.go:281",
+    "internal/live/agy.go:288",
+    "internal/live/agy.go:295",
+    "internal/live/agy.go:300",
+    "internal/live/dialect.go:188",
+    "internal/live/dialect_test.go:64",
+    "internal/hookclient/hookclient.go:77",
+    "internal/live/dialect_test.go:116"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adopt",
+   "principle_fit": [
+    "P2",
+    "P7",
+    "Z7"
+   ],
+   "principle_conflict": [],
+   "proof_purpose": "G1 output never widens native permissions: its PreToolUse output set is {empty, deny}, and '{}' (a deny on agy 1.1.27) is never printed by accident.",
+   "hook_mapping": "PreToolUse",
+   "g1_design": "G1's agy adapter is a pure translation table from abstract decisions {none, deny, continue, inject} to agy JSON, with a fixture-replay test asserting the PreToolUse output set is {'', deny} and that '{}' and 'allow' never appear.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-39",
+   "name": "agy tool results recovered from the transcript",
+   "statement": "Because agy's PostToolUse carries no output or exit code (its 'error' field is empty even when 'false' exits 1) and the shell result reaches the transcript only after the hook returns, the shell PostToolUse is held and resolved at the next event from the transcript line whose step_index equals stepIdx.",
+   "mechanism": "agyHold()/agyFlush() keep held posts per conversation and release them in order once agyStepResult() finds the line, or with unknown exit at a PreInvocation or Stop (internal/live/agy.go:66-137); agyStepResult() parses 'exited with code N' and strips Output/Stdout/Stderr labels (internal/live/agy.go:166-200); tested on a captured agy 1.3.0 transcript (internal/live/dialect_test.go:79-107, testdata/hooks/agy/transcript_full.jsonl:3). The captured PostToolUse for 'false' has \"error\": \"\" while the transcript says 'exited with code 1' (testdata/hooks/agy/PostToolUse-step6.json:4, testdata/hooks/agy/transcript_full.jsonl:7); at a final flush an unresolved hold is emitted as a success with unknown exit (internal/live/agy.go:116-127).",
+   "refs": [
+    "internal/live/agy.go:74",
+    "internal/live/agy.go:108",
+    "internal/live/agy.go:173",
+    "internal/live/agy.go:192",
+    "internal/live/dialect_test.go:79",
+    "testdata/hooks/agy/transcript_full.jsonl:3",
+    "testdata/hooks/agy/PostToolUse-step6.json:4",
+    "testdata/hooks/agy/transcript_full.jsonl:7",
+    "internal/live/agy.go:122"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P7",
+    "P3"
+   ],
+   "principle_conflict": [
+    "Z5: the transcript is a host file the agent's shell can also write, so its exit codes are observations, not G1 evidence",
+    "The held queue lives in daemon memory (internal/live/agy.go:94-97); a per-call G1 hook must persist it or re-read the transcript",
+    "Z7: an unresolved result is recorded as success instead of unknown"
+   ],
+   "proof_purpose": "Observation of which shell steps ran and their host-reported exit codes, for control and measurement only.",
+   "hook_mapping": "PostToolUse",
+   "g1_design": "G1 records (conversationId, stepIdx, args digest) at PostToolUse and resolves results at the next PreInvocation/Stop by reading transcript_full.jsonl with a persisted offset and last-line hash; unresolved results stay unknown, the parse regex is anchored and vector-tested, and results feed only control vectors, never completion.",
+   "cost": "medium"
+  },
+  {
+   "id": "ASC-40",
+   "name": "agy turn boundaries and usage from transcript",
+   "statement": "Because samcheonpo assumes agy has no prompt event, the first PreInvocation (invocationNum 0) is treated as the user turn with the request read from the latest USER_INPUT <USER_REQUEST> block, later PreInvocations deliver pending advice, and token usage comes from PLANNER_RESPONSE lines with cached tokens subtracted.",
+   "mechanism": "agyIn maps PreInvocation 0 to UserPromptSubmit and others to Inject (internal/live/agy.go:49-60); agyUserRequest extracts the request (internal/live/agy.go:250-279); agyUsage emits per-step Usage events and the daemon adds only increases per message id (internal/live/agy.go:202-248, internal/live/hooks.go:766-816); TestAgyFixtures replays captured agy 1.3.0 payloads end to end and asserts exact token sums (internal/live/live_test.go:1405-1475).",
+   "refs": [
+    "internal/live/agy.go:52",
+    "internal/live/agy.go:60",
+    "internal/live/agy.go:250",
+    "internal/live/agy.go:236",
+    "internal/live/hooks.go:790",
+    "internal/live/live_test.go:1409",
+    "internal/live/live_test.go:1472"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P7",
+    "P6"
+   ],
+   "principle_conflict": [
+    "Z6: the extracted request is untrusted input, not a contract",
+    "P8: the agy comment says there are no session events (internal/live/agy.go:13-14) while G1 measured that SessionStart works on 1.1.27",
+    "Mathematics Placement: tokens are a measurement covariate only; there are no Gemini price rows (internal/cost/prices.yml:7)"
+   ],
+   "proof_purpose": "A turn boundary for per-turn displacement and continuation counting.",
+   "hook_mapping": "PreInvocation",
+   "g1_design": "G1 segments turns with SessionStart plus PreInvocation invocationNum, never derives contract content from transcript request text, and reads token counts offline in the measurement harness only.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-41",
+   "name": "Reversible named hook group for agy",
+   "statement": "The agy installer adds one named 'samcheonpo' group to the global ~/.gemini/config/hooks.json (PreToolUse and PostToolUse with matcher '*', PreInvocation, Stop; 5 s, Stop 160 s), records the exact bytes it added, writes atomically with a backup, refuses symlinked settings, and uninstalls only if the group is still byte-identical.",
+   "mechanism": "agyGroup and InstallAgy (internal/install/jsonhooks.go:165-222) and UninstallAgy with jsonEqual (internal/install/jsonhooks.go:224-268); writeAtomic temp-file, fsync and rename with 0600 backups (internal/install/install.go:274-311); symlinked settings are refused (internal/install/install.go:240-242); a failed state write rolls the config back (internal/install/jsonhooks.go:355-372).",
+   "refs": [
+    "internal/install/jsonhooks.go:170",
+    "internal/install/jsonhooks.go:179",
+    "internal/install/jsonhooks.go:204",
+    "internal/install/jsonhooks.go:248",
+    "internal/install/install.go:240",
+    "internal/install/install.go:285",
+    "internal/install/install_test.go:124",
+    "internal/install/preservation_test.go:97"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P6",
+    "P2",
+    "TW"
+   ],
+   "principle_conflict": [
+    "P7: built for agy 1.3.x; it registers no SessionStart or PostInvocation and no workspace .agents/hooks.json layer",
+    "matcher '*' is not a valid regex if agy 1.1.27 compiles matchers as regexes",
+    "the absolute binary path is baked in; if the binary moves, agy's fail-closed PreToolUse blocks every call",
+    "doctor never compares the installed group with the record, so agent edits go unnoticed"
+   ],
+   "proof_purpose": "G1's group in the root-of-trust file equals the recorded installed bytes, and removing G1 restores the host config exactly (TW a).",
+   "hook_mapping": "outside-hooks",
+   "g1_design": "G1 installs groups in both hooks.json layers for all six events with regex matchers valid on 1.1.27 ('.*'), records exact bytes and SHA-256, verifies them at every SessionStart, and uninstalls only byte-identical entries.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-42",
+   "name": "Thin fail-open hook client with deadlines",
+   "statement": "The hook process reads stdin, sends one request to the daemon with a per-event deadline (PreToolUse 15 ms, Stop 150 s, others 50 ms) that the daemon honors by stopping file reads 2 ms early and counting late denies as possibly undelivered, never retries after writing, and on any failure prints nothing and exits 0.",
+   "mechanism": "timeoutFor(), a 5 ms connect timeout and a 500 ms cold-start spawn window bound the call (internal/hookclient/hookclient.go:22-67); every error path calls pass() (internal/hookclient/hookclient.go:117-177); the daemon finishes pre-tool file reads 2 ms before the deadline (internal/live/hooks.go:373-385). Late denies increment preLate (internal/live/hooks.go:520-522); TestBlockDecidedAfterClientDeadlineIsReportedUndelivered covers it (internal/live/live_test.go:1171).",
+   "refs": [
+    "internal/hookclient/hookclient.go:1",
+    "internal/hookclient/hookclient.go:29",
+    "internal/hookclient/hookclient.go:46",
+    "internal/hookclient/hookclient.go:141",
+    "internal/live/hooks.go:376",
+    "internal/live/hooks.go:520",
+    "internal/live/live_test.go:1171"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "duplicate-of:T1 fail-closed gates and fail-open projection (samcheonpo makes the gate fail-open too)",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P2",
+    "TW"
+   ],
+   "principle_conflict": [
+    "Z7/P4: on agy, where PreToolUse is fail-closed by host design, a fail-open client turns every G1 gate into best effort; G1's authority gates must fail closed",
+    "agy inverts the timing semantics: a PreToolUse timeout blocks the call, it does not let it through"
+   ],
+   "proof_purpose": "TW(a): removing or crashing the advisory path never blocks the native agent.",
+   "hook_mapping": "PreToolUse",
+   "g1_design": "G1's PreToolUse has two parts: a fail-closed authority part (protected paths, G1 state, self-invocation) computed in-process from local files with no daemon, and a fail-open advisory part that prints nothing on any error; every hook run journals start and finish so a killed hook is recorded.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-43",
+   "name": "Host capability profiles and output filtering",
+   "statement": "Each host adapter declares which hook outputs it can carry with a tested version range, unsupported fields are stripped, a block requested on a host that cannot block is downgraded to advice, a user message or observation, and payload-shape drift drops the host to observe-only.",
+   "mechanism": "adapter.Profiles declares Caps per agent; agy has BlockPre, BlockStop, PromptInject, PostFailure and ExitInHook but no InjectPre/InjectPost/UserMessage, tested 1.3.0-1.3.999 (internal/adapter/caps.go:14-90); FilterOutput strips unsupported fields (internal/live/hooks.go:89-138); dispatch() checks hookShape and marks the agent shape-bad (internal/live/hooks.go:158-161). policy.Decide downgrades routes by capability (internal/policy/policy.go:13-29); forwarder plugins map Hermes, OpenClaw and opencode events into the same dialect (plugins/hermes/__init__.py:31-64, plugins/openclaw/index.js:50-56, plugins/opencode/samcheonpo.ts:42-45).",
+   "refs": [
+    "internal/adapter/caps.go:15",
+    "internal/adapter/caps.go:73",
+    "internal/adapter/caps.go:128",
+    "internal/live/hooks.go:90",
+    "internal/live/hooks.go:158",
+    "internal/policy/policy.go:13",
+    "plugins/hermes/__init__.py:58",
+    "plugins/openclaw/index.js:50"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P7",
+    "P2",
+    "Z7"
+   ],
+   "principle_conflict": [
+    "Z7: capabilities are not gated by version, so agy 1.1.27 (outside the tested 1.3.x range) gets full capabilities; code comments and docs disagree (internal/adapter/caps.go:33-35 versus internal/adapter/caps.go:122-137)"
+   ],
+   "proof_purpose": "Every recorded enforcement went through a channel the host contract says is fail-closed.",
+   "hook_mapping": "n/a",
+   "g1_design": "The agy adapter declares per-event capabilities from G1's measured facts (PreToolUse deny, fail-closed; SessionStart and PreInvocation inject, fail-open; Stop continue up to 10; PostInvocation terminate) and the core marks an intervention 'enforced' only on a fail-closed route.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-44",
+   "name": "Payload-shape tripwire per host event",
+   "statement": "Tool hook payloads must carry session, tool name, call id, an object tool_input with a command or path and, for PostToolUse, a result; the first mismatch drops every session of that agent to observe-only until restart and is reported by doctor and the status line.",
+   "mechanism": "hookShape checks fields (internal/live/hookshape.go:18-64) and markShapeBad downgrades all sessions of the agent (internal/live/hookshape.go:81-105) from dispatch (internal/live/hooks.go:158-161). Static reading shows that agy non-shell PostToolUse events carry no tool_response and an empty error (internal/live/agy.go:66-79), so the first successful file read or write likely trips this and silently disables agy intervention; no test covers that path (internal/live/live_test.go:1409-1475 replays run_command only).",
+   "refs": [
+    "internal/live/hookshape.go:18",
+    "internal/live/hookshape.go:60",
+    "internal/live/hookshape.go:81",
+    "internal/live/hooks.go:158",
+    "internal/live/agy.go:78",
+    "internal/live/hookshape_test.go:59"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P7",
+    "Z5",
+    "Z7"
+   ],
+   "principle_conflict": [
+    "Z7: degrading to observe-only on drift is fail-open for authority",
+    "quality: the check is not calibrated to what agy actually sends, which a captured non-shell fixture would have caught"
+   ],
+   "proof_purpose": "Every agy stdin in this session matched the pinned contract for agy 1.1.27 for its event type.",
+   "hook_mapping": "PreToolUse",
+   "g1_design": "Pin a per-event schema for agy 1.1.27 derived from captured payloads of every tool type; on mismatch record a host-contract violation, keep guardrail denies on, distrust derived observations, and refuse completion until the measurement harness re-tests the host contract.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-45",
+   "name": "Captured host payloads as golden fixtures",
+   "statement": "Real agy 1.3.0 hook payloads (PreInvocation 0-3, PreToolUse and PostToolUse for steps 2/4/6 and write_to_file, Stop) and a transcript are frozen in testdata and replayed through the daemon, defining the tested version range.",
+   "mechanism": "testdata/hooks/agy holds the payloads and transcript (testdata/hooks/agy/PreInvocation-0.json:1-11, testdata/hooks/agy/Stop.json:1-13); TestAgyFixtures and TestAgyTranscriptResult replay them (internal/live/live_test.go:1405-1475, internal/live/dialect_test.go:79-107); the fixture PreToolUse-write_to_file.json is unused by any test.",
+   "refs": [
+    "testdata/hooks/agy/PreInvocation-0.json:4",
+    "testdata/hooks/agy/PreToolUse-step2.json:5",
+    "testdata/hooks/agy/Stop.json:8",
+    "testdata/hooks/agy/transcript_full.jsonl:1",
+    "internal/live/live_test.go:1415",
+    "internal/live/dialect_test.go:80"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adopt",
+   "principle_fit": [
+    "P4",
+    "P7",
+    "Z7"
+   ],
+   "principle_conflict": [
+    "P7: captured on agy 1.3.0, not G1's 1.1.27"
+   ],
+   "proof_purpose": "G1's agy adapter parses exactly the payloads agy 1.1.27 emitted, pinned by SHA-256.",
+   "hook_mapping": "outside-hooks",
+   "g1_design": "Capture all six agy 1.1.27 events for every tool type plus transcript_full.jsonl, pin them by SHA-256, replay them in CI, and treat a recapture diff as the host-contract re-test.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-46",
+   "name": "Delivery is not compliance: staged intervention log",
+   "statement": "Each intervention moves proposed, emitted, delivered (a one-shot token echoed after the client printed it), acknowledged, then effect_observed over a 10-event window or censored, with immutable stage times, no 'resolved' outcome, and at most one prescription per cause and three per revision.",
+   "mechanism": "Delivery tokens and the 100 ms ack wait (internal/live/daemon.go:243-280, internal/hookclient/hookclient.go:178-185); Advance enforces monotone stages (internal/recovery/recovery.go:191-228, internal/ledger/recovery.go:28-50); trackOutcomes observes a 10-event window (internal/live/recovery.go:157-229); Select caps prescriptions and offers one handoff for a repeated cause (internal/recovery/recovery.go:233-258); the CLI never merges outcomes into 'resolved' (internal/cli/livecmd.go:428-510).",
+   "refs": [
+    "internal/live/daemon.go:247",
+    "internal/hookclient/hookclient.go:182",
+    "internal/recovery/recovery.go:191",
+    "internal/ledger/recovery.go:28",
+    "internal/live/recovery.go:174",
+    "internal/recovery/recovery.go:244",
+    "internal/live/recovery_test.go:66",
+    "internal/live/daemon.go:275"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adapt",
+   "principle_fit": [
+    "Z4",
+    "Z5",
+    "Z7",
+    "P8"
+   ],
+   "principle_conflict": [
+    "Z4: 'delivered' only means printed to hook stdout; agy injection is fail-open and model uptake is unprovable"
+   ],
+   "proof_purpose": "Measurement: G1 emitted injection X at stepIdx k, and what happened in the next N relevant steps (censored when unknown).",
+   "hook_mapping": "PreInvocation",
+   "g1_design": "G1 writes each injectSteps emission (variant id, conversationId, stepIdx) to its ledger after a successful stdout flush, caps injections per cause and revision, and uses the staged outcome schema in A/B analysis, counting censored separately.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-47",
+   "name": "Refuse agent shell calls to user-only verbs",
+   "statement": "PreToolUse denies shell commands that run the harness's user-only verbs (accept, keep, skip, edit, extend, rollback apply, contract accept) in command position, including through env/sudo/sh -c wrappers and heredoc interpreter bodies, at every rollout stage.",
+   "mechanism": "userOnlyCommand splits segments outside quotes, strips assignments and wrappers, recurses into shells and scans heredoc bodies (internal/live/useronly.go:20-127, internal/classify/heredoc.go:392-407); onPreTool applies it before any rollout logic (internal/live/hooks.go:392-408); the README admits a same-user process can still reach the daemon socket (README.en.md:292).",
+   "refs": [
+    "internal/live/useronly.go:20",
+    "internal/live/useronly.go:57",
+    "internal/classify/heredoc.go:392",
+    "internal/live/hooks.go:392",
+    "internal/live/useronly_test.go:5",
+    "README.en.md:292"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "duplicate-of:vesperchant 00-instinct (trusted channel versus data channel)",
+   "verdict": "adapt",
+   "principle_fit": [
+    "Z1",
+    "Z6"
+   ],
+   "principle_conflict": [
+    "Z1: text parsing; eval, python -c, variable indirection, xargs, script files and direct socket access bypass it (internal/live/useronly.go:17-19)"
+   ],
+   "proof_purpose": "None on its own (defense in depth); authority must sit outside the agent's OS identity.",
+   "hook_mapping": "PreToolUse",
+   "g1_design": "G1 has no user-operated verbs (P6), so its PreToolUse simply denies any run_command whose text names the G1 binary or G1 state paths, as defense in depth behind protected-path hashing.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-48",
+   "name": "Observational injection format and directive lint",
+   "statement": "Agent-facing messages follow a fixed four-line observational form (observation, evidence event numbers, measured cost or unknown, contract goal) with any prescription kept separate, templates are linted for directive vocabulary, and an agent skill tells the agent to treat warnings as facts, not instructions.",
+   "mechanism": "intervene.Agent renders templates/ko/*.agent.tmpl and appends the .rx prescription unless the arm is 'fact' (internal/intervene/intervene.go:188-206); ForbiddenRe is checked only over static template source in a test (internal/intervene/intervene.go:248-250, internal/intervene/intervene_test.go:17-26); SKILL.md says warnings are observed facts (plugins/claude-code/skills/samcheonpo/SKILL.md:48) and to claim completion only from check results (plugins/claude-code/skills/samcheonpo/SKILL.md:136).",
+   "refs": [
+    "internal/intervene/intervene.go:188",
+    "internal/intervene/intervene.go:248",
+    "internal/intervene/intervene_test.go:17",
+    "internal/intervene/templates/ko/s5.false_done.agent.tmpl:1",
+    "plugins/claude-code/skills/samcheonpo/SKILL.md:48",
+    "plugins/claude-code/skills/samcheonpo/SKILL.md:136"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "duplicate-of:vesperchant 3-tier hooks (PreInvocation ground-truth injection) and RULES.md rule files",
+   "verdict": "adapt",
+   "principle_fit": [
+    "Z4",
+    "Z5",
+    "PH"
+   ],
+   "principle_conflict": [
+    "Z5: agent-controlled cmd, path and goal strings are interpolated unescaped and the lint never sees rendered text",
+    "templates are Korean-only and the Korean \\b boundary in the lint is ineffective",
+    "Z1: skill instructions are unenforceable"
+   ],
+   "proof_purpose": "None for authority; makes every G1 injection a quoted fact tied to a receipt.",
+   "hook_mapping": "PreInvocation",
+   "g1_design": "G1 injections are lines like 'fact | G1 receipt seq/hash | criterion', with agent-derived strings quoted and length-capped, and the lint runs on the final rendered text with Unicode-aware boundaries; any skill text is an A/B-tested injection variant, never authority.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-49",
+   "name": "Contract draft from manifest-derived check candidates",
+   "statement": "On a new task, if drafts are enabled or a contract file exists, the agent is asked to draft .samcheonpo/contract.yml from candidate checks read from package.json, go.mod, pyproject, Makefile and CI files, told not to wait for acceptance, and a written draft is validated with errors fed back at PostToolUse.",
+   "mechanism": "Candidates and DraftRequest (internal/contract/contract.go:529-660); onPrompt injects the draft request with draftContinueNote (internal/live/hooks.go:288-321); onContractWritten parses the draft, records it as draft, and returns validation errors (internal/live/hooks.go:651-693).",
+   "refs": [
+    "internal/contract/contract.go:529",
+    "internal/contract/contract.go:641",
+    "internal/live/hooks.go:291",
+    "internal/live/hooks.go:321",
+    "internal/live/hooks.go:658",
+    "internal/contract/contract_test.go:210"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P2",
+    "P6"
+   ],
+   "principle_conflict": [
+    "Z1/Z2: the agent drafts its own acceptance criteria; repository CI text is injected into the prompt and executed once accepted"
+   ],
+   "proof_purpose": "Candidate deterministic checks exist for each acceptance criterion (an input to the coverage matrix, not authority).",
+   "hook_mapping": "SessionStart",
+   "g1_design": "G1 may propose coverage rows from manifest-derived candidates, but the contract's checks are accepted only after G1's coverage-matrix lint and oracle pinning; CI-derived commands are labeled untrusted.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-50",
+   "name": "Hash-assigned experiment arms for injections",
+   "statement": "Advice is assigned deterministically by hash(session, rule) to a none, fact-only or prescription arm; the control arm records the verdict but delivers and blocks nothing, and outcomes are tabulated per arm without ever claiming 'resolved'.",
+   "mechanism": "Arm() (internal/detect/engine.go:1597-1608) assigned to live L1 non-S5 signals when experiments are on (internal/detect/engine.go:1582-1584); PreToolUse records and returns nothing for the none arm (internal/live/hooks.go:481-491); intervene renders fact versus prescription (internal/intervene/intervene.go:186-206); the intervention table uses Wilson intervals per arm (internal/cli/livecmd.go:496-503); experiments default off (internal/config/config.go:243).",
+   "refs": [
+    "internal/detect/engine.go:1598",
+    "internal/detect/engine.go:1600",
+    "internal/live/hooks.go:484",
+    "internal/intervene/intervene.go:189",
+    "internal/cli/livecmd.go:496",
+    "internal/config/config.go:243"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adopt",
+   "principle_fit": [
+    "P8",
+    "Z7"
+   ],
+   "principle_conflict": [
+    "quality: hex[0] % 3 over 16 values gives a 6/5/5 split, biasing the none arm"
+   ],
+   "proof_purpose": "Measurement: the effect of an injected content variant is estimated against a deterministic control arm.",
+   "hook_mapping": "PreInvocation",
+   "g1_design": "G1 assigns arms by an unbiased reduction of SHA-256(conversationId, experiment id) (rejection sampling or a full-integer modulus), records the arm in its ledger, and never applies arms to authority-path decisions.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-51",
+   "name": "Interval statistics with withholding rules",
+   "statement": "Rates carry Wilson 95% intervals, arm differences use a paired task-cluster percentile bootstrap (4000 resamples, seed 73129, Bonferroni-adjusted), and verdicts are withheld below 12 clusters or 30 paired blocks, on version or grader gaps, or on degenerate intervals, with a pre-registered sample-size planner.",
+   "mechanism": "Wilson (internal/eval/eval.go:157-168); Newcombe-style bound reported only (internal/bench/live.go:541); cluster bootstrap and withholding (internal/bench/cluster.go:29-178); MinTrials=30, non-inferiority margin 0.05 and cost goal 0.20 (internal/bench/live.go:471-473); RequiredTaskPairs gives 126 pairs for sd 0.2, gap 0.05, alpha 0.05, power 0.8 (internal/bench/cluster.go:182-191, internal/bench/cluster_test.go:78-80).",
+   "refs": [
+    "internal/eval/eval.go:157",
+    "internal/bench/live.go:541",
+    "internal/bench/cluster.go:30",
+    "internal/bench/cluster.go:98",
+    "internal/bench/live.go:473",
+    "internal/bench/cluster.go:187",
+    "internal/bench/cluster_test.go:29"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adopt",
+   "principle_fit": [
+    "Z7",
+    "PH"
+   ],
+   "principle_conflict": [],
+   "proof_purpose": "None (measurement): confidence intervals for host-contract re-tests and A/B tests of injected content.",
+   "hook_mapping": "outside-hooks",
+   "g1_design": "G1's measurement harness reports every rate (for example 'DONE after block: 3/8') with a Wilson interval, compares variants with a paired cluster bootstrap over tasks, and refuses to promote a variant below pre-registered sample sizes.",
+   "cost": "medium"
+  },
+  {
+   "id": "ASC-52",
+   "name": "A/B protocol hygiene and cost attribution",
+   "statement": "Arm order is permuted per task-by-trial block with a recorded seed, every trial gets a fresh repo copy and an isolated harness home, result rows are rejected on duplicates, mixed versions, double-counted sessions or unpaired blocks, cost is taken only from a unique fresh transcript matched by session and workspace, and harness overhead is counted only after its process is proven terminated.",
+   "mechanism": "Seeded block permutation (internal/bench/protocol.go:23-44); fresh copy, git init and SAMCHEONPO_HOME per trial (internal/bench/live.go:199-243); ValidateRows (internal/bench/protocol.go:94-144); transcript resolution and cost_known=false fallbacks (internal/bench/transcript.go:15-49, internal/bench/live.go:322-342); monitor termination check via /proc environ then SIGTERM (internal/bench/daemonstop_linux.go:16-34).",
+   "refs": [
+    "internal/bench/protocol.go:34",
+    "internal/bench/live.go:243",
+    "internal/bench/protocol.go:94",
+    "internal/bench/transcript.go:35",
+    "internal/bench/daemonstop_linux.go:16",
+    "internal/bench/protocol_test.go:15"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adopt",
+   "principle_fit": [
+    "P3",
+    "Z5",
+    "Z7"
+   ],
+   "principle_conflict": [],
+   "proof_purpose": "None (measurement): A/B rows are independent, paired and attributable.",
+   "hook_mapping": "outside-hooks",
+   "g1_design": "Each G1 A/B trial uses an isolated HOME (so ~/.gemini/config/hooks.json does not leak between arms), a fresh repo copy, a seeded block order, a transcript bound by conversationId plus workspacePaths plus mtime after trial start, and row validation before analysis.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-53",
+   "name": "Pre-registered, hash-pinned corpus evaluation",
+   "statement": "Stored session records are re-analyzed in isolation from a manifest that pins every source, contract and context file by SHA-256, rejects train/eval leakage by source hash or benchmark task, reads labels only after predictions are fixed, leaves unlabeled runs unscored, and reports precision, recall and FPR with Wilson intervals and effectiveness_validated=false.",
+   "mechanism": "corpus.go strict JSON decoding and SHA-256 pinning (internal/eval/corpus.go:142-168), leakage checks (internal/eval/corpus.go:252-266), isolated scratch analysis (internal/eval/corpus.go:268), label reading after predictions (internal/eval/corpus.go:309-325), metrics (internal/eval/corpus.go:170-196, internal/eval/corpus.go:375).",
+   "refs": [
+    "internal/eval/corpus.go:154",
+    "internal/eval/corpus.go:252",
+    "internal/eval/corpus.go:309",
+    "internal/eval/corpus.go:375",
+    "internal/eval/corpus_test.go:100",
+    "docs/spec/agenttime-reliability.md:184"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adopt",
+   "principle_fit": [
+    "P3",
+    "Z5",
+    "Z7"
+   ],
+   "principle_conflict": [],
+   "proof_purpose": "None (measurement): rule and injection effects measured on a frozen, leakage-free corpus.",
+   "hook_mapping": "outside-hooks",
+   "g1_design": "G1 keeps a pinned corpus of captured agy transcripts for regression and A/B scoring of control rules, with labels read only after predictions.",
+   "cost": "medium"
+  },
+  {
+   "id": "ASC-54",
+   "name": "Scenario DSL with fires and not-fires expectations",
+   "statement": "Forty YAML scenarios script prompts, shell runs with exit codes and output, writes, edits and final messages, render them to a synthetic transcript, and assert which rules must fire, must not fire, and a maximum level, identically across two runs.",
+   "mechanism": "Strict scenario decoding and rendering (internal/bench/bench.go:70-189) and expectation checks (internal/bench/bench.go:48-54, internal/bench/bench.go:249-277); TestSeedScenarios runs them twice and requires normal scenarios below L2 (internal/bench/bench_test.go:12-47); examples include s5-false-done-failed and the honest-failure negative (bench/scenarios/s5-false-done-failed/scenario.yml:12-13, bench/scenarios/s5-honest-failure/scenario.yml:12-14).",
+   "refs": [
+    "internal/bench/bench.go:81",
+    "internal/bench/bench.go:249",
+    "internal/bench/bench_test.go:12",
+    "bench/scenarios/s5-false-done-failed/scenario.yml:13",
+    "bench/scenarios/s5-honest-failure/scenario.yml:13"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adopt",
+   "principle_fit": [
+    "Z7",
+    "P8"
+   ],
+   "principle_conflict": [
+    "P7: the DSL renders Claude transcripts only; there is no agy scenario"
+   ],
+   "proof_purpose": "None (regression): each control rule fires on its positive scenarios and stays silent on honest negatives.",
+   "hook_mapping": "outside-hooks",
+   "g1_design": "G1 adds an agy-format scenario DSL (hook payloads plus transcript lines) to regression-test its Stop controller, revisit detection and false-DONE counting, including honest-failure negatives.",
+   "cost": "medium"
+  },
+  {
+   "id": "ASC-55",
+   "name": "Implementation-agnostic conformance suite",
+   "statement": "A stdlib-only runner invokes any implementation as a command, independently recomputes the hash chain, checks head, row count, token totals, must-fire and must-not-fire rules, contract state, progress grade and cross-agent verdict equality, and a v2 suite requires exact golden seals while 8 tampering mutations must exit non-zero.",
+   "mechanism": "cmd/samcheonpo-conformance recomputes sha256(prev||0x00||row) and compares (cmd/samcheonpo-conformance/main.go:66-161); same_verdicts_as compares rule@level sets across agents (cmd/samcheonpo-conformance/main.go:163-170); task.go checks golden canonical and seal output plus mutations future-version, tool-origin, revision-gap, missing-input, duplicate-proof, false-pass, tampered-goal and unknown-field (cmd/samcheonpo-conformance/task.go:47-92); CI runs it (.github/workflows/ci.yml:31).",
+   "refs": [
+    "cmd/samcheonpo-conformance/main.go:66",
+    "cmd/samcheonpo-conformance/main.go:100",
+    "cmd/samcheonpo-conformance/main.go:163",
+    "cmd/samcheonpo-conformance/task.go:49",
+    "conformance/cases/codex-masked-exit-stuck/case.json:6",
+    ".github/workflows/ci.yml:31",
+    "conformance/cases/claude-false-done/case.json:4"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "duplicate-of:T1 receipt-binding completion gate (adds an independent verifier and a mutation suite)",
+   "verdict": "adopt",
+   "principle_fit": [
+    "P5",
+    "P7",
+    "Z5",
+    "Z7"
+   ],
+   "principle_conflict": [
+    "quality: the level check compares strings lexicographically (cmd/samcheonpo-conformance/main.go:137)"
+   ],
+   "proof_purpose": "G1's receipt and ledger format is reproducible by an independent recomputation, and forged, stale or tool-origin evidence cannot produce a receipt.",
+   "hook_mapping": "outside-hooks",
+   "g1_design": "G1 ships golden agy cases and an independent verifier for its ledger and receipts, plus a mutation suite (tampered goal, tool-origin intent, revision gap, false pass, unknown field) that must all be rejected; run it on every agy upgrade.",
+   "cost": "medium"
+  },
+  {
+   "id": "ASC-56",
+   "name": "Offline replay, gap sampling and human labels",
+   "statement": "Past transcripts are re-run through the same engine in audit mode and bucketed into progress, exploration, waste and other with 'would have intervened N times', spans the rules missed are sampled for human labels, labels are scored by majority consensus with Cohen's kappa, and real failure spans can be rebuilt into replay tasks when restorable by hash.",
+   "mechanism": "analyze.Run and hindsight buckets (internal/analyze/analyze.go:93-140, internal/analyze/analyze.go:203-313) with a sum invariant (internal/analyze/analyze.go:330-350); gaps sampler (internal/analyze/gaps.go:13-96); consensus and kappa (internal/eval/eval.go:394-458, internal/eval/eval.go:539-561); replay builder (internal/bench/replay.go:46-160).",
+   "refs": [
+    "internal/analyze/analyze.go:93",
+    "internal/analyze/analyze.go:265",
+    "internal/analyze/gaps.go:13",
+    "internal/eval/eval.go:539",
+    "internal/bench/replay.go:85",
+    "internal/analyze/analyze_test.go:28"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "research",
+   "principle_fit": [
+    "PH",
+    "Z7"
+   ],
+   "principle_conflict": [
+    "P6: human labeling",
+    "P8: hindsight buckets are heuristic (explore if a write follows within 20 events)",
+    "P7: no offline agy transcript parser (internal/sources/sources.go:95-109)"
+   ],
+   "proof_purpose": "None (developer-side measurement).",
+   "hook_mapping": "outside-hooks",
+   "g1_design": "If used, replay captured agy transcripts offline to tune Stop-continuation thresholds; keep labels out of every runtime path.",
+   "cost": "medium"
+  },
+  {
+   "id": "ASC-57",
+   "name": "Hook latency benchmark with server cross-check",
+   "statement": "An isolated benchmark sends a cold first prompt then n warm PreToolUse calls, cross-checks the daemon's received-call counts so fast fail-open replies never count as passes, reports p50/p95/p99/max, and a light hook binary without CLI, SQLite or SDK imports cuts p95 from 21.2 ms to 8.7 ms on one host.",
+   "mechanism": "bench-hook (internal/cli/livecmd.go:220-379, internal/cli/livecmd.go:358-359); CI gates only the handling span at 6 ms via scripts/check-hook-budget.sh (scripts/check-hook-budget.sh:13, .github/workflows/ci.yml:35); cmd/samcheonpo-hook sets GOMAXPROCS(1) (cmd/samcheonpo-hook/main.go:17-19); measurements and their non-guarantee are documented (docs/spec/hook-startup.md:55-63).",
+   "refs": [
+    "internal/cli/livecmd.go:358",
+    "scripts/check-hook-budget.sh:13",
+    ".github/workflows/ci.yml:35",
+    "cmd/samcheonpo-hook/main.go:17",
+    "docs/spec/hook-startup.md:61",
+    "docs/spec/hook-startup.md:63"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "adapt",
+   "principle_fit": [
+    "P8",
+    "Z7"
+   ],
+   "principle_conflict": [
+    "measured p95 of 13.7-18.1 ms under load breaks the 15 ms gate budget (docs/spec/hook-startup.md:63)"
+   ],
+   "proof_purpose": "Measurement: G1 hook latency distributions on this host fit agy's timeouts with margin, since a G1 PreToolUse timeout blocks the call.",
+   "hook_mapping": "outside-hooks",
+   "g1_design": "G1's host-contract re-test ensemble invokes each hook via 'sh -c' from the hooks.json directory, reports p95 with an interval against agy's timeout, and fails the re-test if fail-closed hooks approach it.",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-58",
+   "name": "Pre-run denies that police wasted runs",
+   "statement": "Several PreToolUse denies stop wasteful but harmless runs: an identical failing verification on an unchanged workspace, a rejected unknown command rerun, a return to an already-failed token structure, a full suite after a small change, an unprobed long run, a rerun of a check with valid evidence, and source edits during an external-cause freeze.",
+   "mechanism": "PreCheck and PreGuard return these denies (internal/detect/engine.go:1382-1424, internal/detect/verifier_deadlock.go:66-82, internal/detect/ast_oscillation.go:155-168, internal/detect/test_scope.go:84-123, internal/detect/long_run.go:66-94, internal/live/verification_plan.go:64-116, internal/detect/engine.go:736-749); each is advised first and blocked on repeat (internal/policy/rollout.go:63-83).",
+   "refs": [
+    "internal/detect/engine.go:1402",
+    "internal/detect/verifier_deadlock.go:66",
+    "internal/detect/ast_oscillation.go:163",
+    "internal/detect/test_scope.go:97",
+    "internal/detect/long_run.go:82",
+    "internal/live/verification_plan.go:101",
+    "internal/detect/marathon_test.go:41"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "duplicate-of:T1 stagnation and oscillation detection (as deny gates)",
+   "verdict": "reject",
+   "principle_fit": [],
+   "principle_conflict": [
+    "PH: they save effort; they do not prevent loss of work or false completion",
+    "P2: they override native agent choices",
+    "Mathematics Placement: semantic oscillation (identifiers to IDENT, literals to LIT) and command scope parsing are heuristics in a gate",
+    "Z7: the evidence-rerun gate fails open past the 15 ms deadline"
+   ],
+   "proof_purpose": "none",
+   "hook_mapping": "PreToolUse",
+   "g1_design": "",
+   "cost": "medium"
+  },
+  {
+   "id": "ASC-59",
+   "name": "Effort, time and cost advisories",
+   "statement": "A family of advice-only detectors polices effort: read-only streaks (20 reads or 10 minutes), verify-to-produce ratio (4:1 in 20 events), test bloat (60+ lines and 3x code), verify after docs-only changes, repeated reviews, serial triage (10 cycles), flaky UI races, post-completion sleeps, session length tiers (2 h/10M and 4 h/30M tokens), idle spend, spend velocity, and an external iron-laws audit after every write.",
+   "mechanism": "exploration, verifyRatio, testBloat, verifyAfterDocs, reviewRepeat, cost and sessionLength in the engine (internal/detect/engine.go:1162-1244, internal/detect/engine.go:1149-1160, internal/detect/engine.go:584-633, internal/detect/engine.go:1278-1344); mass_triage, flaky_race and explicit_waiting (internal/detect/mass_triage.go:39-58, internal/detect/flaky_race.go:23-58, internal/detect/explicit_waiting.go:32-70); defaults (internal/config/config.go:202-239); iron-laws runs a PATH-resolved binary asynchronously with a 60 s timeout and is on by default (internal/live/ironlaws.go:32-122, internal/config/config.go:245).",
+   "refs": [
+    "internal/detect/engine.go:1182",
+    "internal/detect/engine.go:1235",
+    "internal/detect/engine.go:1151",
+    "internal/detect/mass_triage.go:56",
+    "internal/detect/flaky_race.go:49",
+    "internal/detect/explicit_waiting.go:58",
+    "internal/detect/engine.go:1339",
+    "internal/live/ironlaws.go:39",
+    "internal/config/config.go:245"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "reject",
+   "principle_fit": [],
+   "principle_conflict": [
+    "PH and Mathematics Placement: effort is not a G1 variable",
+    "P8: no proof-bearing purpose",
+    "P7: iron-laws is an unvetted third-party binary resolved from PATH"
+   ],
+   "proof_purpose": "none",
+   "hook_mapping": "PostToolUse",
+   "g1_design": "",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-60",
+   "name": "Advice-then-block ladder with human release",
+   "statement": "Signals carry hand-set confidences (below 0.5 never delivered), one primary per event with a 5-event cooldown, and a heuristic rule turns from advice into a deny only after acknowledged advice for the same (revision, rule, kind, target), under a 3-block cap, unless the user released it; user false-positive marks also raise thresholds by 50% per 3 marks up to 2x.",
+   "mechanism": "combine() applies floor, cooldown and suppressed escalation (internal/detect/engine.go:1524-1595); adviceKey and routeFor with Escalate (internal/live/session.go:544-576, internal/policy/rollout.go:43-57); ackSlot commits advice only after the client prints (internal/live/ack.go:3-52); OverrideSteps converts false positives into threshold steps with 14-day decay (internal/live/session.go:245-274, internal/detect/engine.go:1493-1504); this state lives in memory only and resets with the daemon (internal/live/session.go:97-103).",
+   "refs": [
+    "internal/detect/engine.go:1536",
+    "internal/detect/engine.go:1559",
+    "internal/live/session.go:567",
+    "internal/policy/rollout.go:46",
+    "internal/live/ack.go:41",
+    "internal/live/session.go:260",
+    "internal/live/session.go:101",
+    "internal/live/live_test.go:366"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "reject",
+   "principle_fit": [],
+   "principle_conflict": [
+    "P4/Mathematics Placement: exists to tolerate heuristic false positives; G1 denies only on deterministic facts and does so immediately",
+    "P6/Z6: release and threshold feedback need the user",
+    "P3: escalation state is in daemon memory and any same-UID process can reset it with a Shutdown request (internal/live/daemon.go:342)"
+   ],
+   "proof_purpose": "none",
+   "hook_mapping": "PreToolUse",
+   "g1_design": "",
+   "cost": "medium"
+  },
+  {
+   "id": "ASC-61",
+   "name": "Optional LLM drift judge",
+   "statement": "Every 15 tool events, with an accepted contract and no gap, an optional model (Anthropic haiku by default, or an OpenAI-compatible or loopback endpoint) labels recent activity on_track, side_quest or drift, and two drift labels raise an L2 advisory, with cost reserved before each call.",
+   "mechanism": "judge prompt and label parsing (internal/judge/judge.go:146-167), SDK with zero retries, 30 s timeout and 16 output tokens (internal/judge/judge.go:107-134), loopback-only dialer when local (internal/judge/judge.go:57-104); budget reservation before dispatch, dedupe and stop on unknown cost (internal/judge/budget.go:30-80, internal/live/session.go:1195-1281); two drift labels raise s3.drift (internal/live/session.go:1302-1311); off by default (internal/config/config.go:242).",
+   "refs": [
+    "internal/judge/judge.go:146",
+    "internal/judge/judge.go:159",
+    "internal/judge/budget.go:30",
+    "internal/live/session.go:1249",
+    "internal/live/session.go:1307",
+    "internal/config/config.go:242",
+    "internal/judge/local_test.go:11"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "duplicate-of:vesperchant 3-tier hooks (Stop audit with a fast judge model)",
+   "verdict": "reject",
+   "principle_fit": [],
+   "principle_conflict": [
+    "Z1-Z4: a model judges agent behavior and the prompt contains agent-authored command summaries (prompt-injectable)",
+    "P4/Mathematics Placement: nondeterministic",
+    "network egress when enabled"
+   ],
+   "proof_purpose": "none",
+   "hook_mapping": "n/a",
+   "g1_design": "",
+   "cost": "medium"
+  },
+  {
+   "id": "ASC-62",
+   "name": "Text heuristics for shell, scripts and contracts",
+   "statement": "Shell commands are classified (verify, produce, explore, mutating, unknown) by stage-splitting and regex/word lists, heredoc and embedded Python/Node bodies are parsed for writes and executions, masked exit codes are inferred from output, and natural-language 'forbid' entries become rules by substring ('test', '테스트', 'dependenc').",
+   "mechanism": "classify.Shell and Initial (internal/classify/classify.go:110-311), heredoc and Python write detection (internal/classify/heredoc.go:28-232, internal/classify/pyscript.go:32-130), MaskedExit (internal/classify/scope.go:675-742, internal/detect/engine.go:379-397), forbid keywords (internal/contract/contract.go:307-327, internal/detect/engine.go:1056-1066).",
+   "refs": [
+    "internal/classify/classify.go:110",
+    "internal/classify/classify.go:170",
+    "internal/classify/heredoc.go:28",
+    "internal/classify/pyscript.go:32",
+    "internal/classify/scope.go:675",
+    "internal/contract/contract.go:307",
+    "internal/classify/classify_test.go:9"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "reject",
+   "principle_fit": [],
+   "principle_conflict": [
+    "Z2/Z5: silent false negatives (env rm, command rm, docker exec, find -delete, git clean, bash -c, python -c) and agent-writable verify_commands skip write detection",
+    "P4: substring forbid rules misfire ('latest', 'attestation')"
+   ],
+   "proof_purpose": "none; G1 detects mutation by tree hash instead of parsing commands",
+   "hook_mapping": "PreToolUse",
+   "g1_design": "",
+   "cost": "medium"
+  },
+  {
+   "id": "ASC-63",
+   "name": "Per-session hash chain and seal",
+   "statement": "Each completed analysis is serialized into canonical redacted rows (paths and test names hashed), chained with SHA-256(prev||0x00||row), and summarized by a seal, but rows are deleted and re-inserted per analysis, the head lives in the same database, and there is no anchor or pending journal.",
+   "mechanism": "seal.Build, Link and CheckChain (internal/seal/seal.go:74-167); SaveAnalysis deletes and re-inserts event, verdict and session rows and INSERT OR REPLACEs the seal (internal/ledger/ledger.go:159-166, internal/ledger/ledger.go:217); evidence-ledger/2 TaskSeal binds payload hashes (internal/seal/task.go:26-105); the spec admits a same-OS user can recompute hashes (docs/spec/progress-contract-v2-draft.md:57).",
+   "refs": [
+    "internal/seal/seal.go:123",
+    "internal/seal/seal.go:149",
+    "internal/ledger/ledger.go:160",
+    "internal/ledger/ledger.go:217",
+    "internal/seal/task.go:52",
+    "docs/spec/progress-contract-v2-draft.md:57",
+    "internal/seal/seal_test.go:21"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "duplicate-of:T1 hash-chained append-only ledger with head anchor, pending journal and crash recovery",
+   "verdict": "reject",
+   "principle_fit": [
+    "P5"
+   ],
+   "principle_conflict": [
+    "P3: mutable rows and no anchor make it weaker than T1's ledger"
+   ],
+   "proof_purpose": "none beyond T1",
+   "hook_mapping": "outside-hooks",
+   "g1_design": "",
+   "cost": "low"
+  },
+  {
+   "id": "ASC-64",
+   "name": "Resident per-user daemon behind a socket",
+   "statement": "A long-lived per-user daemon (spawned by the first hook, flock-guarded, idle exit) holds all session state and serves hooks over a 0600 unix socket that accepts any same-UID peer, with an optional shared budget across linked parent/child sessions.",
+   "mechanism": "Daemon lock, socket and peer-credential check (internal/live/daemon.go:91-148, internal/live/peercred_linux.go:13-30, internal/sockpath/sockpath.go:30-52); Shutdown and Command events need only the same UID (internal/live/daemon.go:342-375); swarm tree budgets (internal/live/swarm.go:112-135, internal/live/swarm_wire.go:150-169).",
+   "refs": [
+    "internal/live/daemon.go:95",
+    "internal/live/daemon.go:144",
+    "internal/live/peercred_linux.go:13",
+    "internal/live/daemon.go:342",
+    "internal/live/swarm.go:112",
+    "internal/live/peercred_linux_test.go:11"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "reject",
+   "principle_fit": [],
+   "principle_conflict": [
+    "P3: state outside a canonical on-disk store, lost or reset when the process dies",
+    "Z1: the agent runs as the same UID and can forge commands or shut the daemon down",
+    "P8: G1's per-call hooks need no resident process"
+   ],
+   "proof_purpose": "none",
+   "hook_mapping": "n/a",
+   "g1_design": "",
+   "cost": "high"
+  },
+  {
+   "id": "ASC-65",
+   "name": "Ownership-proven rollback and passing-point snapshots",
+   "statement": "A file is agent-owned only if its post-write hash equals the content implied by the write tool input applied to the pre-write content and nobody changed it since; owned files are snapshotted at each passing check and can be restored through a preview whose plan id must still match at apply time.",
+   "mechanism": "trackBefore/expectedContent/trackAfter (internal/live/rollback.go:133-260), planWith and runRollback with backups and atomic os.Root writes (internal/live/rollback.go:326-516), golden snapshots (latest 5, 64 MiB) in .samcheonpo/snapshots without hash verification on read (internal/patch/golden_state.go:100-203); agy edits are never owned (internal/live/agy.go:154-157).",
+   "refs": [
+    "internal/live/rollback.go:186",
+    "internal/live/rollback.go:226",
+    "internal/live/rollback.go:355",
+    "internal/live/rollback.go:426",
+    "internal/patch/golden_state.go:178",
+    "internal/live/live_test.go:1197"
+   ],
+   "evidence_quality": "tested",
+   "novelty": "new",
+   "verdict": "research",
+   "principle_fit": [
+    "PH",
+    "P3"
+   ],
+   "principle_conflict": [
+    "P6: a human previews and applies",
+    "Z1/Z2: snapshots live in the agent-writable project and are not verified on restore",
+    "P7: ownership depends on Claude Write/Edit argument shapes"
+   ],
+   "proof_purpose": "Bytes of the agent-owned files at the moment receipt R passed (loss-of-work prevention).",
+   "hook_mapping": "outside-hooks",
+   "g1_design": "If adopted, store receipt-bound trees as git objects under a G1-owned ref outside the agent's reach, verify hashes on read, and derive ownership from G1's own pre/post hashes rather than tool-argument replay.",
+   "cost": "medium"
+  }
+ ],
+ "adoption_candidates": [
+  "ASC-38: agy output table emits only empty, deny, continue or injectSteps (never allow or '{}'), independently matching G1's measured agy facts.",
+  "ASC-03: acceptance oracle kept outside the agent-writable tree and digest-pinned before, during and after verification.",
+  "ASC-04: graders must observe expected outputs; an exit(0) stub or emptied test must fail, so exit 0 alone never proves a criterion.",
+  "ASC-15: a sticky gap counter (stepIdx contiguity, Pre/Post pairing, transcript parse) makes completion fail closed when G1's fact log is incomplete.",
+  "ASC-16: tri-state facts and tool calls; unknown never satisfies a completion predicate.",
+  "ASC-11: deterministic protected-path deny in PreToolUse for both hooks.json files, G1 state, contract and pinned oracles.",
+  "ASC-17: static evidence-basis table so only G1-produced deterministic facts may deny or continue.",
+  "ASC-22: pass requires exit 0, no timeout, untruncated output and an unchanged tree across the run.",
+  "ASC-02: discard results if contract, intent or tree identity changed mid-run, and count skipped or side-effect checks as failed.",
+  "ASC-45: captured host payloads and transcripts as SHA-256-pinned fixtures; a recapture diff is the host-contract re-test.",
+  "ASC-05: receipts pin G1 evaluator version and the merged hook-policy hash; later events void them.",
+  "ASC-55: independent conformance verifier plus a mutation suite that must reject forged, stale or tool-origin evidence.",
+  "ASC-27: strict-shrink progress over comparable G1-run checks as the Stop controller's displacement signal.",
+  "ASC-31: persisted, never-decreasing count of G1's own continuations, stopping after k zero-displacement turns well below agy's 10.",
+  "ASC-06: imported or remembered evidence is history until G1 recomputes its key against the current tree and contract.",
+  "ASC-51: Wilson intervals, paired cluster bootstrap and withholding rules for host-contract re-tests and injection A/B tests.",
+  "ASC-50: deterministic hash-assigned experiment arms with a silent control arm (fix the 6/5/5 modulo bias).",
+  "ASC-19: every regex the adapter uses ships with must-match and must-not-match vectors checked at load.",
+  "ASC-44: per-event payload-shape schema for agy 1.1.27, calibrated on captured payloads of every tool type, failing closed for completion.",
+  "ASC-30: revisit detection on whole-tree hashes as the oscillation input that ends Stop continuations.",
+  "ASC-07: strict contract decoding plus a criteria-by-checks coverage matrix that rejects manual-only criteria.",
+  "ASC-21: receipt key with contract hash, scrubbed-env digest and runner version where an empty field means unknown.",
+  "ASC-12: replace test-weakening regexes with SHA-256 pinning of oracle files (tests, conftest, test configs).",
+  "ASC-13: deny publish/release/tag-push unless the latest G1 receipt passed on the current tree hash.",
+  "ASC-26: control state as a pure, idempotent fold over the ledger, with an incremental-equals-rescan property test."
+ ],
+ "risks": [
+  "Completion enforcement is off by default: in 'recommend' mode s5.stop_unmet can never block because its advice is only produced inside the block branch, so a false 'done' ends the turn; blocking needs validated mode with an operator digest (internal/live/hooks.go:700, internal/policy/rollout.go:22, internal/live/session.go:695, internal/live/live_test.go:279).",
+  "Stop gate fails open on skipped or side-effect checks, a draft or stale contract (an agent write to contract.yml resets acceptance to draft), queue gaps, and checks exceeding the 150 s client wait (internal/live/hooks.go:707, internal/live/hooks.go:670, internal/live/session.go:783, internal/live/session.go:769, internal/hookclient/hookclient.go:31).",
+  "Every hook failure is fail-open: the client prints nothing on any error or after the 15 ms PreToolUse budget, so a slow or dead daemon silently disables all gates; under agy, where PreToolUse timeouts block, the semantics differ from samcheonpo's assumptions (internal/hookclient/hookclient.go:1, internal/hookclient/hookclient.go:141, README.en.md:290).",
+  "Likely agy bug (static inference, untested): non-shell agy PostToolUse events carry no tool_response, hookShape treats that as payload drift, and markShapeBad drops every agy session to observe-only until the daemon restarts (internal/live/agy.go:78, internal/live/hookshape.go:60, internal/live/hookshape.go:81).",
+  "agy version mismatch: fixtures and capability profile cover agy 1.3.x, not G1's 1.1.27; the installer registers no SessionStart or PostInvocation, uses matcher '*' (an invalid regex if matchers are regexes), and bakes in an absolute binary path whose absence would make agy's fail-closed PreToolUse block every call (internal/adapter/caps.go:73, internal/install/jsonhooks.go:179, internal/install/jsonhooks.go:41, internal/live/agy.go:13).",
+  "Same-OS-user trust boundary: any agent-run process can talk to the daemon socket (Command accept/keep/extend, forged hook events, Shutdown that resets in-memory escalation state), read acceptance.key to forge contract acceptance, and recompute ledger hashes (internal/live/daemon.go:342, internal/live/daemon.go:369, internal/contract/contract.go:393, internal/live/session.go:101, README.en.md:292, docs/spec/progress-contract-v2-draft.md:57).",
+  "The agent-writable project file .samcheonpo.yml can lower the rollout mode to shadow and the block cap to 0 for the next session, and it is not in the watched config list; unknown YAML keys are silently ignored (internal/config/config.go:329, internal/config/config.go:333, internal/config/config.go:282).",
+  "An observation gap suppresses all hook output, including protected-path, budget and ceiling denies (internal/live/hooks.go:80).",
+  "Ledger is mutable and unanchored: session rows are deleted and re-inserted per analysis, seals are INSERT OR REPLACE, the head lives in the same database, and non-accepted contract states (skipped, done) are not MAC-checked (internal/ledger/ledger.go:160, internal/ledger/ledger.go:217, internal/contract/contract.go:379).",
+  "Network egress when enabled: optional LLM judge via the Anthropic SDK (default model claude-haiku-4-5) or an OpenAI-compatible endpoint, and push notifications to public ntfy.sh by default once a topic is set; desktop notifications are on by default and spawn notify-send/osascript/PowerShell (internal/judge/judge.go:127, internal/judge/judge.go:206, internal/notify/notify.go:64, internal/notify/notify.go:43, internal/config/config.go:241, go.mod:6).",
+  "Prompt-injection surfaces: the judge prompt embeds agent-authored command summaries and parses labels by substring; the anchor parser accepts the tag anywhere and SKILL.md tells the agent to adopt any ANCHOR line; repository CI 'run:' lines are injected into the contract draft request (internal/live/session.go:1213, internal/judge/judge.go:159, internal/hookclient/anchor.go:74, plugins/claude-code/skills/samcheonpo/SKILL.md:88, internal/contract/contract.go:620).",
+  "Imperative agent-facing text: the draft note tells the agent not to wait for acceptance, the capability-limit prescription suggests switching to a stronger model, and SKILL.md instructs downloading and installing release binaries (internal/live/hooks.go:321, internal/intervene/templates/ko/s6.capability_limit.rx.tmpl:1, plugins/claude-code/skills/samcheonpo/SKILL.md:16).",
+  "Remedy command injection: subjects extracted from untrusted tool output (module names, URLs) are substituted unsanitized into commands presented for a human to run (internal/fp/failclass.go:71, internal/fp/failclass.go:238, internal/intervene/templates/ko/s2.environment.user.tmpl:3).",
+  "External programs run outside agent permission prompts: iron-laws resolved from PATH after every write (enabled by default), '<agent> --version' probes, git inside the agent-controlled repository (repo-local git config such as fsmonitor or filters applies), and desktop notifiers (internal/live/ironlaws.go:39, internal/config/config.go:245, internal/adapter/caps.go:176, internal/live/ws.go:165).",
+  "Checks run with the daemon's unscrubbed environment, and non-worktree checks run in the live project directory (internal/live/verification_plan.go:80, internal/live/checkpoint.go:126).",
+  "Transcript-derived evidence is spoofable: the agy transcript is a file the agent's shell can write, an unresolved agy result is recorded as success at a final flush, and legacy Codex exit codes take the first regex match in program output (internal/live/agy.go:173, internal/live/agy.go:122, internal/adapter/codex/parser.go:516).",
+  "Weak identifiers: fingerprints and authority keys are SHA-256 truncated to 128 bits, receipts show a 12-hex seal prefix, and rollback plan ids are 32-bit (internal/fp/fp.go:18, internal/seal/seal.go:46, internal/live/rollback.go:367).",
+  "Privacy: the ledger stores plaintext paths, an 80-character first prompt, full goals, check commands and verdict messages; the store_raw_text option is declared but unused (internal/ledger/ledger.go:170, internal/ledger/ledger.go:187, internal/config/config.go:184).",
+  "Classifier false negatives (env rm, command rm, docker exec, find -delete, git clean, bash -c, python -c) leave the workspace fingerprint unchanged, and agent-writable verify_commands skip write detection (internal/classify/classify.go:71, internal/classify/classify.go:170).",
+  "Bench graders and replay tasks execute candidate or agent-typed code with the full user environment and are not sandboxed; the Windows VM script downloads unpinned toolchains and CI uses mutable action tags (internal/bench/live.go:311, docs/benchmarks/protocol-v1.md:17, scripts/windows-vm-test.sh:91, .github/workflows/ci.yml:16).",
+  "Quality: experiment arms use hex[0] % 3 (a 6/5/5 split), the conformance level check compares strings lexicographically, semantic oscillation conflates identifier/literal-only fixes, the claim regex misses 'Fixed the failing test. Done.', and code comments contradict code on version gating and probe timeouts (internal/detect/engine.go:1600, cmd/samcheonpo-conformance/main.go:137, internal/detect/ast_oscillation.go:163, internal/detect/bypass.go:143, internal/adapter/caps.go:33, docs/spec/hook-startup.md:33).",
+  "Language and pricing fit: all injected templates are Korean-only, and there are no Gemini price rows, so agy usage is always unpriced (internal/intervene/intervene.go:19, internal/cost/prices.yml:7).",
+  "Evidence is mostly unit, fixture and synthetic-scenario tests: real-agent verification is claimed only for repeated-failure nudges and blocks (including agy) and a few Claude Code features, while waiting/stall advice and most long-session rules are unverified with real agents (docs/support-matrix.md:55, docs/support-matrix.md:58, docs/support-matrix.md:61).",
+  "Effectiveness is unproven by the authors' own account: small samples, no general savings claim, effectiveness_validated=false (README.en.md:288, internal/eval/corpus.go:375).",
+  "License: MIT, permissive; no concern (LICENSE:1)."
+ ]
+}

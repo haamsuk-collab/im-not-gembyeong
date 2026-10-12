@@ -1,0 +1,12 @@
+Review src/semver.py in this workspace against SPEC.md. Another model wrote the implementation; it passes tests/test_semver.py. Your job is to find every behaviour that contradicts SPEC.md and to prove each one.
+
+Rules:
+1. Do not fix anything and do not modify, create or delete any file in this workspace. Your only writes are challenge files in ~/.g1/workspaces/4fac4d6810ba0001/challenges/ (that directory is outside the workspace; G1, the verification harness running here, reads it).
+2. A finding counts only as a challenge file. Write each with your file-writing tool to ~/.g1/workspaces/4fac4d6810ba0001/challenges/<id>.json, exactly in this shape:
+{"id": "<short-id>", "claim": "<one sentence: what the code does, what SPEC.md requires, and the SPEC section>", "by": "claude-opus-5-5-high", "contract": {"task": "fix-<short-id>", "objective": "<one sentence>", "criteria": [{"id": "C1", "text": "<observable fact>"}], "checks": [{"id": "K1", "argv": ["python3", "-c", "<self-contained code>"], "kind": "must_flip", "covers": ["C1"], "targets": ["src/semver.py"], "timeout_s": 60}], "allowed_paths": ["src/"], "oracle_files": []}}
+3. The check code must import the implementation with: import sys; sys.path.insert(0, 'src'); import semver. It must exit with status 1 now, because of the defect, and with status 0 once the defect is fixed. It must test one defect. Use ids made of letters, digits and hyphens.
+4. Before you write a challenge, run its check yourself with your shell tool and confirm that it exits 1 now. If the terminal sandbox refuses to start a command, run it again with the sandbox bypassed.
+5. Report only contradictions with SPEC.md. Do not report style, performance or behaviour that SPEC.md leaves open.
+6. G1 runs every check you submit on the current code: all checks failing records the challenge as confirmed, any check passing records it as unproven. A person decides afterwards whether each confirmed challenge is right.
+
+When you are done, reply with one line per challenge: id, confirmed or not as far as you know, and the SPEC rule.

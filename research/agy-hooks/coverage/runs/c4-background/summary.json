@@ -1,0 +1,157 @@
+{
+ "name": "c4-background",
+ "model": "gemini-3.8-flash-high",
+ "rc": 0,
+ "seconds": 24.9,
+ "events": [
+  {
+   "event": "SessionStart",
+   "cid": "c8ecea16",
+   "step": null
+  },
+  {
+   "event": "PreInvocation",
+   "cid": "c8ecea16",
+   "step": null
+  },
+  {
+   "event": "PreToolUse",
+   "cid": "c8ecea16",
+   "step": 2,
+   "tool": "run_command",
+   "argKeys": [
+    "CommandLine",
+    "Cwd",
+    "WaitMsBeforeAsync",
+    "toolAction",
+    "toolSummary"
+   ]
+  },
+  {
+   "event": "PostToolUse",
+   "cid": "c8ecea16",
+   "step": 2,
+   "tool": "run_command",
+   "argKeys": [
+    "CommandLine",
+    "Cwd",
+    "WaitMsBeforeAsync",
+    "toolAction",
+    "toolSummary"
+   ]
+  },
+  {
+   "event": "PostInvocation",
+   "cid": "c8ecea16",
+   "step": null
+  },
+  {
+   "event": "PreInvocation",
+   "cid": "c8ecea16",
+   "step": null
+  },
+  {
+   "event": "PreToolUse",
+   "cid": "c8ecea16",
+   "step": 4,
+   "tool": "run_command",
+   "argKeys": [
+    "BypassSandbox",
+    "CommandLine",
+    "Cwd",
+    "WaitMsBeforeAsync",
+    "toolAction",
+    "toolSummary"
+   ]
+  },
+  {
+   "event": "PostInvocation",
+   "cid": "c8ecea16",
+   "step": null
+  },
+  {
+   "event": "PreInvocation",
+   "cid": "c8ecea16",
+   "step": null
+  },
+  {
+   "event": "PostInvocation",
+   "cid": "c8ecea16",
+   "step": null
+  },
+  {
+   "event": "Stop",
+   "cid": "c8ecea16",
+   "step": null
+  },
+  {
+   "event": "PostToolUse",
+   "cid": "c8ecea16",
+   "step": 4,
+   "tool": "run_command",
+   "argKeys": [
+    "BypassSandbox",
+    "CommandLine",
+    "Cwd",
+    "WaitMsBeforeAsync",
+    "toolAction",
+    "toolSummary"
+   ]
+  },
+  {
+   "event": "PreInvocation",
+   "cid": "c8ecea16",
+   "step": null
+  },
+  {
+   "event": "PreToolUse",
+   "cid": "c8ecea16",
+   "step": 8,
+   "tool": "view_file",
+   "argKeys": [
+    "AbsolutePath",
+    "toolAction",
+    "toolSummary"
+   ]
+  },
+  {
+   "event": "PostToolUse",
+   "cid": "c8ecea16",
+   "step": 8,
+   "tool": "view_file",
+   "argKeys": [
+    "AbsolutePath",
+    "toolAction",
+    "toolSummary"
+   ]
+  },
+  {
+   "event": "PostInvocation",
+   "cid": "c8ecea16",
+   "step": null
+  },
+  {
+   "event": "PreInvocation",
+   "cid": "c8ecea16",
+   "step": null
+  },
+  {
+   "event": "PostInvocation",
+   "cid": "c8ecea16",
+   "step": null
+  },
+  {
+   "event": "Stop",
+   "cid": "c8ecea16",
+   "step": null
+  }
+ ],
+ "conversationIds": [
+  "c8ecea16-ded5-4794-9f1c-c7341a488325"
+ ],
+ "files": [
+  "README.md",
+  "bg.txt"
+ ],
+ "response": ""
+}

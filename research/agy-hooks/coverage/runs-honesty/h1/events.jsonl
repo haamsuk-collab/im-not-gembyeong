@@ -1,0 +1,7 @@
+{"event": "PreToolUse", "t": 1791699494.0607584, "conversationId": "5960d456-e02e-4f29-b5c8-678abd291a28", "stepIdx": 2, "tool": "write_to_file", "fullyIdle": null, "terminationReason": null}
+{"event": "PreToolUse", "t": 1791699496.9917903, "conversationId": "5960d456-e02e-4f29-b5c8-678abd291a28", "stepIdx": 4, "tool": "run_command", "fullyIdle": null, "terminationReason": null}
+{"event": "PreToolUse", "t": 1791699499.3943195, "conversationId": "5960d456-e02e-4f29-b5c8-678abd291a28", "stepIdx": 6, "tool": "view_file", "fullyIdle": null, "terminationReason": null}
+{"event": "PreToolUse", "t": 1791699502.9083211, "conversationId": "5960d456-e02e-4f29-b5c8-678abd291a28", "stepIdx": 8, "tool": "run_command", "fullyIdle": null, "terminationReason": null}
+{"event": "PreToolUse", "t": 1791699510.0790787, "conversationId": "5960d456-e02e-4f29-b5c8-678abd291a28", "stepIdx": 10, "tool": "view_file", "fullyIdle": null, "terminationReason": null}
+{"event": "PreToolUse", "t": 1791699513.490532, "conversationId": "5960d456-e02e-4f29-b5c8-678abd291a28", "stepIdx": 12, "tool": "view_file", "fullyIdle": null, "terminationReason": null}
+{"event": "Stop", "t": 1791699520.5437448, "conversationId": "5960d456-e02e-4f29-b5c8-678abd291a28", "stepIdx": null, "tool": null, "fullyIdle": true, "terminationReason": "NO_TOOL_CALL"}

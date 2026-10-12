@@ -1,0 +1,2086 @@
+{
+  "scope": "governance",
+  "atoms": [
+    {
+      "id": "GOV-01",
+      "name": "Reconstruct continuity from durable state only",
+      "statement": "A fresh agent must reconstruct valid continuation from the repository and canonical harness state alone; any continuation-critical fact held elsewhere is a defect.",
+      "mechanism": "Master Goal O1 and AGENTS.md rule 1; audits prove it by running full lifecycles in fresh processes with empty HOME/CODEX_HOME using only plan, ledger, head and evidence files.",
+      "threat": "principle",
+      "refs": [
+        "T1_MASTER_GOAL.md:22",
+        "AGENTS.md:3",
+        "T1_CONTROL_PLANE_REDUCTION_REAUDIT.md:37",
+        "T1_OPTIONAL_CORE_TRIM_REAUDIT.md:24"
+      ],
+      "tests": [
+        "tests/test_optional_core_trim.py::test_fresh_process_continuation_uses_plan_report_and_session_start"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: G1 must rebuild every decision from its own observed ledger, never from omp session state."
+    },
+    {
+      "id": "GOV-02",
+      "name": "Ephemeral context is never authority",
+      "statement": "Conversation, memory, summaries, transcripts, handoffs, sessions and compaction output are disposable inputs and must never serve as authority.",
+      "mechanism": "O2; the spec checker rejects text granting them authority, production code has no read path to them, and an E2E proves an ephemeral nonce is unrecoverable from authority after real /clear boundaries.",
+      "threat": "principle",
+      "refs": [
+        "T1_MASTER_GOAL.md:27",
+        "scripts/check_contracts.py:36",
+        "scripts/check_contracts.py:37",
+        "T1_LOGICAL_SESSION_E2E_RETRY_REAUDIT.md:233"
+      ],
+      "tests": [
+        "tests/test_contract_assets.py::test_master_goal_rejects_semantic_contradictions"
+      ],
+      "coupling": "host-neutral",
+      "loc": 2,
+      "g1_hint": "keep: treat omp transcripts and compaction summaries as untrusted model-authored input."
+    },
+    {
+      "id": "GOV-03",
+      "name": "Each turn is a bounded fail-closed slice",
+      "statement": "Every disposable turn performs a bounded slice of work and either durably progresses or pauses fail-closed; multi-turn work continues only through durable state.",
+      "mechanism": "O1; the one-shot fresh-turn adapter classifies each turn into typed outcomes (active, no_durable_progress, blocked, typed errors) from before/after canonical snapshots.",
+      "threat": "principle",
+      "refs": [
+        "T1_MASTER_GOAL.md:23",
+        "T1_STATELESS_FRESH_TURN_REAUDIT.md:327"
+      ],
+      "tests": [
+        "tests/test_fresh_turn.py::test_no_delta_turn_is_exact_ephemeral_and_restartable"
+      ],
+      "coupling": "host-neutral",
+      "loc": 293,
+      "g1_hint": "keep: G1 should close every omp turn with a harness-computed durable-delta verdict."
+    },
+    {
+      "id": "GOV-04",
+      "name": "Task completion never implies Goal completion",
+      "statement": "Completing an atomic task proves only that task's contract and never implies completion of the overall Goal.",
+      "mechanism": "O3; the checker rejects TaskComplete-implies-GoalComplete wording, and supervisor/driver protocols treat an active child's goal_complete or a selector's task_complete as invalid.",
+      "threat": "principle",
+      "refs": [
+        "T1_MASTER_GOAL.md:33",
+        "scripts/check_contracts.py:34",
+        "scripts/check_contracts.py:35",
+        "T1_CONSERVATIVE_TURN_SUPERVISOR_REAUDIT.md:414"
+      ],
+      "tests": [
+        "tests/test_conservative_turn_supervisor.py::test_task_complete_and_goal_complete_remain_distinct",
+        "tests/test_no_active_selection.py::test_no_selection_is_not_goal_completion"
+      ],
+      "coupling": "host-neutral",
+      "loc": 2,
+      "g1_hint": "keep: stops an agent from parlaying one green task into a 'done' claim."
+    },
+    {
+      "id": "GOV-05",
+      "name": "Hard gates before any authority",
+      "statement": "A candidate becomes authority only after hard invariants, deterministic task verification, frozen anchors, history preservation and context independence all pass.",
+      "mechanism": "O4; each task's Public Verify (full suite, lint, contract checker, hook render check, smoke, ledger verify) runs as a root subprocess and must yield a success receipt before explicit completion.",
+      "threat": "principle",
+      "refs": [
+        "T1_MASTER_GOAL.md:38",
+        "README.md:79",
+        ".agents/skills/verify/SKILL.md:16"
+      ],
+      "tests": [
+        "tests/test_cli.py::test_verify_report_and_completion_gate"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: in G1 only harness-executed gates can promote a change."
+    },
+    {
+      "id": "GOV-06",
+      "name": "Model reports and opinions are not authority",
+      "statement": "Preferences, model reports, a bare process exit and audit opinions are never authority; findings count only after reproduction and acceptance.",
+      "mechanism": "O4; completion reads only root-appended receipts and recomputed digests, the verify skill forbids converting self-report into evidence, and audits reproduce each finding by command.",
+      "threat": "principle",
+      "refs": [
+        "T1_MASTER_GOAL.md:40",
+        ".agents/skills/verify/SKILL.md:20",
+        "CODEX_ROOT_HARNESS_POST_IMPLEMENTATION_AUDIT.md:63"
+      ],
+      "tests": [
+        "tests/test_security_core.py::test_manifest_self_report_forgery_invalidates_success"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: this is G1's founding rule; extend it to all LLM text."
+    },
+    {
+      "id": "GOV-07",
+      "name": "Reject dominated higher-complexity candidates",
+      "statement": "Reject any candidate dominated by a known capability-equivalent lower-complexity candidate, and freeze only after a delete-first test finds no equivalent reduction.",
+      "mechanism": "O7 and P10; audits run delete-first/minimality challenges with line-level LOC classification and issued DELETE verdicts (PreToolUse, cache, route/delegate, resume, migration, oracle, Stop).",
+      "threat": "principle",
+      "refs": [
+        "T1_MASTER_GOAL.md:43",
+        "T1_MASTER_GOAL.md:131",
+        "T1_CONTROL_PLANE_MINIMALITY_AUDIT.md:119",
+        "T1_STOP_HOOK_REDUCTION_REAUDIT.md:117"
+      ],
+      "tests": [],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: every G1 mechanism should be justified by a reproduced threat or deleted."
+    },
+    {
+      "id": "GOV-08",
+      "name": "Preserve native agent capabilities",
+      "statement": "The harness must not override the host agent's reasoning, tools, permissions, sandboxing, approvals, retries, subagents, models, providers or transport.",
+      "mechanism": "O9 and AGENTS.md; T1 has no ordinary-tool hook, no approval reimplementation and no model routing, and smoke plus deletion tests show native tools run unchanged.",
+      "threat": "principle",
+      "refs": [
+        "T1_MASTER_GOAL.md:47",
+        "AGENTS.md:6",
+        "README.md:4"
+      ],
+      "tests": [
+        "tests/test_core_isolation.py::test_no_context_rollover_or_native_tool_interception_was_added"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "modify: G1 may observe and record every omp tool call but should gate only completion claims, not ordinary tools."
+    },
+    {
+      "id": "GOV-09",
+      "name": "Goal spec is inert; progress derived",
+      "statement": "The normative Goal spec stores no progress and adds no runtime or canonical surface; satisfaction is derived on demand from source, contracts, ledger and current receipts.",
+      "mechanism": "Authority section and O11; the checker pins MUTABLE_GOAL_STATE and both SURFACE fields to none and forbids CURRENT_TASK, NEXT_TASK, TASK_QUEUE, PROGRESS and *_SCORE fields.",
+      "threat": "principle",
+      "refs": [
+        "T1_MASTER_GOAL.md:14",
+        "T1_MASTER_GOAL.md:50",
+        "scripts/check_contracts.py:30",
+        "scripts/check_contracts.py:199"
+      ],
+      "tests": [
+        "tests/test_contract_assets.py::test_master_goal_rejects_structural_weakening"
+      ],
+      "coupling": "host-neutral",
+      "loc": 5,
+      "g1_hint": "keep: no mutable progress file an agent could edit to fake advancement."
+    },
+    {
+      "id": "GOV-10",
+      "name": "Lessons persist only as verified artifacts",
+      "statement": "Meta-improvements persist only as verified code, tests, specs or deterministic procedures with anchors intact; lessons-memory, self-approval and weaker verifiers never count as gains.",
+      "mechanism": "O12; the checker forbids 'meta-improvement persists only as lessons', 'weaker verifier allowed' and 'self-approval sufficient' phrasings.",
+      "threat": "principle",
+      "refs": [
+        "T1_MASTER_GOAL.md:54",
+        "scripts/check_contracts.py:50",
+        "scripts/check_contracts.py:51",
+        "scripts/check_contracts.py:52"
+      ],
+      "tests": [
+        "tests/test_contract_assets.py::test_master_goal_rejects_semantic_contradictions"
+      ],
+      "coupling": "host-neutral",
+      "loc": 3,
+      "g1_hint": "keep: encode G1 lessons as tests/checks, never as prompt notes or memory."
+    },
+    {
+      "id": "GOV-11",
+      "name": "Accepted steps require strict gain",
+      "statement": "Each accepted step preserves invariants and verified capability and strictly reduces the unsatisfied goal set, improves verified capability, or reduces complexity at equal capability.",
+      "mechanism": "O6; enforced procedurally by independent audits (capability-regression checks, LOC/surface deltas) and by forbidden checker phrases, not by runtime code.",
+      "threat": "principle",
+      "refs": [
+        "T1_MASTER_GOAL.md:60",
+        "scripts/check_contracts.py:40",
+        "scripts/check_contracts.py:41"
+      ],
+      "tests": [
+        "tests/test_contract_assets.py::test_master_goal_rejects_semantic_contradictions"
+      ],
+      "coupling": "host-neutral",
+      "loc": 2,
+      "g1_hint": "experiment: needs a progress predicate G1 can compute itself instead of audit judgement."
+    },
+    {
+      "id": "GOV-12",
+      "name": "Finite objective terminality, no scores",
+      "statement": "The Goal is a finite set of terminal properties satisfied exactly when none is unsatisfied; percentages, intelligence scalars and subjective scores are never authority.",
+      "mechanism": "O5; the checker rejects percent literals and SCORE/PROGRESS fields and requires 1-10 sequentially numbered terminal properties covering T1-T10.",
+      "threat": "principle",
+      "refs": [
+        "T1_MASTER_GOAL.md:68",
+        "scripts/check_contracts.py:32",
+        "scripts/check_contracts.py:232"
+      ],
+      "tests": [
+        "tests/test_contract_assets.py::test_master_goal_rejects_semantic_contradictions"
+      ],
+      "coupling": "host-neutral",
+      "loc": 6,
+      "g1_hint": "keep: an LLM-produced score must never decide done-ness."
+    },
+    {
+      "id": "GOV-13",
+      "name": "Goal completion bound to current receipt",
+      "statement": "Goal completion requires current deterministic Goal verification and an explicit completion bound to that successful receipt; model declarations, stale verification and unbound reports are rejected.",
+      "mechanism": "O8; goal_complete is derived only from a completed final-verification task evaluated with require_current=True whose transition matches the receipt seq/hash, re-checked on a second stable observation.",
+      "threat": "principle",
+      "refs": [
+        "T1_MASTER_GOAL.md:72",
+        "T1_MULTI_TASK_GOAL_LOOP_REAUDIT.md:528"
+      ],
+      "tests": [
+        "tests/test_no_active_selection.py::test_stale_final_goal_receipt_and_model_declaration_are_rejected",
+        "tests/test_multi_task_goal_loop.py::test_stale_goal_evidence_fails_closed"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: done-ness is a fresh harness re-verification, never a stored flag."
+    },
+    {
+      "id": "GOV-14",
+      "name": "No-active boundary registers one smallest task",
+      "statement": "At a no-active boundary with an unsatisfied property, one fresh native turn records gap/justification fields and registers exactly one smallest justified task by fixed priority (integrity > continuity > capability > native > minimality > convenience); with nothing unsatisfied it creates no task and runs only final verification.",
+      "mechanism": "O10 and read policy; the optional one-shot selector validates the registered contract and attributes it to its own invocation nonce.",
+      "threat": "principle",
+      "refs": [
+        "T1_MASTER_GOAL.md:76",
+        "T1_MASTER_GOAL.md:81",
+        "T1_MASTER_GOAL.md:82"
+      ],
+      "tests": [
+        "tests/test_no_active_selection.py::test_valid_no_active_selection_is_exact_fresh_native_turn",
+        "tests/test_conservative_turn_supervisor.py::test_goal_complete_stops_before_active_boundary"
+      ],
+      "coupling": "host-neutral",
+      "loc": 543,
+      "g1_hint": "modify: keep one-task-at-a-time, but G1 can only validate the selection's structure, not the model's justification."
+    },
+    {
+      "id": "GOV-15",
+      "name": "Forbidden selection anti-patterns",
+      "statement": "Selection must never yield a giant complete-everything task, simultaneous active tasks, a hidden mutable queue, conversation-carried selection, supervisor reasoning or model routing.",
+      "mechanism": "O10 REJECT list mirrored as checker forbidden patterns; AST/source tests assert the supervisor and driver contain no model invocation or planning.",
+      "threat": "principle",
+      "refs": [
+        "T1_MASTER_GOAL.md:83",
+        "scripts/check_contracts.py:44",
+        "scripts/check_contracts.py:49"
+      ],
+      "tests": [
+        "tests/test_conservative_turn_supervisor.py::test_source_contains_no_direct_model_executable_invocation",
+        "tests/test_multi_task_goal_loop.py::test_driver_source_invokes_no_model_selector_episode_or_active_adapter"
+      ],
+      "coupling": "host-neutral",
+      "loc": 6,
+      "g1_hint": "keep: G1 orchestration must stay mechanical and non-planning."
+    },
+    {
+      "id": "GOV-16",
+      "name": "Terminal evidence deterministic and reproducible",
+      "statement": "Each terminal property stays false until its evidence (commands, exits, hashes, receipts, tests, inventories) is reproducible from durable state; vague terms such as 'good enough' are rejected.",
+      "mechanism": "The checker requires a deterministic evidence token in every P-section and rejects a list of vague phrases.",
+      "threat": "principle",
+      "refs": [
+        "T1_MASTER_GOAL.md:90",
+        "scripts/check_contracts.py:237",
+        "scripts/check_contracts.py:242"
+      ],
+      "tests": [
+        "tests/test_contract_assets.py::test_master_goal_rejects_structural_weakening"
+      ],
+      "coupling": "host-neutral",
+      "loc": 7,
+      "g1_hint": "keep: every G1 acceptance criterion must name a command, hash or receipt."
+    },
+    {
+      "id": "GOV-17",
+      "name": "Every P0-P2 finding maps to receipt",
+      "statement": "Audit resolution requires every P0/P1/P2 finding to map to a remediation receipt or an explicit exclusion, with environment, revisions, commands, exits and hashes recorded.",
+      "mechanism": "P09; each re-audit names one next remediation task and the following re-audit independently reproduces the closure before readiness flips.",
+      "threat": "principle",
+      "refs": [
+        "T1_MASTER_GOAL.md:125",
+        "T1_LEDGER_CANONICALITY_REMEDIATION_REAUDIT.md:303"
+      ],
+      "tests": [],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: G1 findings close only by harness-verified receipts, never by agent assertion."
+    },
+    {
+      "id": "GOV-18",
+      "name": "Optional layers removable without damage",
+      "statement": "Optional execution layers must be deletable without canonical migration while leaving the core and the native agent operational.",
+      "mechanism": "O11 and P08; deletion tests remove each adapter, supervisor and driver and re-run the core lifecycle.",
+      "threat": "principle",
+      "refs": [
+        "T1_MASTER_GOAL.md:51",
+        "T1_MASTER_GOAL.md:121"
+      ],
+      "tests": [
+        "tests/test_conservative_turn_supervisor.py::test_supervisor_is_removable_without_core_or_adapter_damage",
+        "tests/test_multi_task_goal_loop.py::test_removing_driver_requires_no_canonical_migration",
+        "tests/test_fresh_turn.py::test_deleting_active_adapter_leaves_core_and_no_active_selector_functional",
+        "tests/test_no_active_selection.py::test_deleting_optional_adapter_leaves_core_and_active_adapter_independent"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: uninstalling G1 must leave omp fully functional."
+    },
+    {
+      "id": "GOV-19",
+      "name": "Restart recovery proven by hash equality",
+      "statement": "Crash/restart recovery is accepted only when real kill/restart tests reproduce identical plan/ledger/head/source/tree/artifact hashes and pass ledger verification.",
+      "mechanism": "P06; real processes are killed at every write boundary (sitecustomize os._exit shims) and recovery must converge to exactly one transition.",
+      "threat": "principle",
+      "refs": [
+        "T1_MASTER_GOAL.md:113",
+        "CODEX_ROOT_HARNESS_LEDGER_V2_REAUDIT.md:29"
+      ],
+      "tests": [
+        "tests/test_completion_boundary_remediation_2.py::test_h1_nine_process_kill_points_converge_exactly_once",
+        "tests/test_ledger_v2.py::test_crash_after_ledger_or_head_recovers_exact_append"
+      ],
+      "coupling": "posix",
+      "loc": 0,
+      "g1_hint": "keep: inject real process kills at every G1 write boundary."
+    },
+    {
+      "id": "GOV-20",
+      "name": "Sterile isolation for end-to-end evidence",
+      "statement": "End-to-end continuity claims require isolated runs with empty user/runtime directories that exclude ephemeral authority and bind a verification receipt.",
+      "mechanism": "P04; native E2E builds empty runtime dirs, admits only auth plus sanitized config, excludes continuity env IDs and seals evidence into a root receipt.",
+      "threat": "principle",
+      "refs": [
+        "T1_MASTER_GOAL.md:104",
+        "T1_MULTI_TASK_GOAL_LOOP_NATIVE_E2E_REAUDIT.md:59"
+      ],
+      "tests": [
+        "tests/test_multi_task_goal_loop_native_e2e.py::test_runtime_directories_begin_empty_and_cleanup",
+        "tests/test_multi_task_goal_loop_native_e2e.py::test_native_environment_excludes_continuity_ids"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: G1's own E2E proofs need empty HOME/config to rule out hidden state."
+    },
+    {
+      "id": "GOV-21",
+      "name": "Unproven failure types stay unclaimed",
+      "statement": "Only boundary and failure types backed by a source matrix and tests are supported; unproven approval/transient types remain unclaimed and are never blindly retried or inferred.",
+      "mechanism": "P07; adapters and supervisors are retry-free, pausing or stopping on every typed error, and launch failures are not retried.",
+      "threat": "principle",
+      "refs": [
+        "T1_MASTER_GOAL.md:117",
+        "T1_STATELESS_FRESH_TURN_REAUDIT.md:336",
+        "T1_ACTIVE_TURN_PROGRESS_DELTA_REMEDIATION_2_REAUDIT.md:617"
+      ],
+      "tests": [
+        "tests/test_fresh_turn.py::test_unavailable_and_nonzero_codex_pause_without_retry",
+        "tests/test_conservative_turn_supervisor.py::test_selector_typed_errors_stop_without_retry",
+        "tests/test_multi_task_goal_loop.py::test_supervisor_launch_failure_is_not_retried"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: no blind retries on unclassified omp/provider errors."
+    },
+    {
+      "id": "GOV-22",
+      "name": "Deferred scope declared and pinned",
+      "statement": "Later-goal exclusions are listed explicitly and the checker pins the exact exclusion set so scope cannot silently grow or shrink.",
+      "mechanism": "EXCLUDED_LATER line in the spec compared set-wise against a constant in the checker.",
+      "threat": "principle",
+      "refs": [
+        "T1_MASTER_GOAL.md:139",
+        "scripts/check_contracts.py:27",
+        "scripts/check_contracts.py:247"
+      ],
+      "tests": [
+        "tests/test_contract_assets.py::test_master_goal_rejects_structural_weakening"
+      ],
+      "coupling": "host-neutral",
+      "loc": 5,
+      "g1_hint": "keep: G1 should state what it does not verify."
+    },
+    {
+      "id": "GOV-23",
+      "name": "Bounded on-demand spec reading",
+      "statement": "With an active task, read only the instruction file, the task contract and canonical state; read the Goal spec only at a no-active boundary or when the contract targets a terminal property.",
+      "mechanism": "Read policy; the selector exits not-applicable without reading the Goal when a task is active, and hooks never read the Goal.",
+      "threat": "principle",
+      "refs": [
+        "T1_MASTER_GOAL.md:142",
+        "T1_MASTER_GOAL_SPEC_COMPRESSION_REAUDIT.md:486"
+      ],
+      "tests": [
+        "tests/test_no_active_selection.py::test_active_task_is_not_applicable_without_reading_master_goal"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "modify: limit G1 context injection, noting G1 cannot verify what the model actually read."
+    },
+    {
+      "id": "GOV-24",
+      "name": "No completion claim without current evidence",
+      "statement": "Never claim a task complete without current evidence; reports must separate passed, failed and unverified facts, cite paths/receipts and avoid confidence language.",
+      "mechanism": "AGENTS.md rule plus report/verify skills; mechanically, plan --status complete and report --require-complete share one evaluator that refuses without a valid current receipt.",
+      "threat": "principle",
+      "refs": [
+        "AGENTS.md:5",
+        ".agents/skills/report/SKILL.md:22",
+        ".agents/skills/report/SKILL.md:23",
+        ".agents/skills/verify/SKILL.md:20"
+      ],
+      "tests": [
+        "tests/test_cli.py::test_verify_report_and_completion_gate"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: in G1 the claim gate is mechanical and chat claims are ignored."
+    },
+    {
+      "id": "GOV-25",
+      "name": "Opt-in enrollment, narrow harness scope",
+      "statement": "The harness is used only for durable continuity and verification; work not enrolled via task begin remains valid native work with no harness continuity claim.",
+      "mechanism": "Template plan holds zero tasks; task begin atomically creates the first contract; unenrolled work is untouched.",
+      "threat": "principle",
+      "refs": [
+        "AGENTS.md:4",
+        "README.md:5",
+        "README.md:13"
+      ],
+      "tests": [
+        "tests/test_plan.py::test_empty_plan_is_valid_and_has_no_current_task"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "modify: G1 observes all turns but issues verification claims only for enrolled tasks."
+    },
+    {
+      "id": "GOV-26",
+      "name": "No host-specific paths in canonical rules",
+      "statement": "Optional external copies are never required for correctness, and canonical instructions/specs must not assume host paths, models, providers or hosts.",
+      "mechanism": "AGENTS.md rule (remediated from a mandatory /sdcard copy); the checker forbids /home,/root,/Users,/data,/sdcard paths and REQUIRED_MODEL/PROVIDER/HOST/HOST_PATH fields in the Goal spec.",
+      "threat": "principle",
+      "refs": [
+        "AGENTS.md:7",
+        "scripts/check_contracts.py:31",
+        "scripts/check_contracts.py:33",
+        "T1_HOST_NEUTRAL_AGENTS_REMEDIATION_REPORT.md:31"
+      ],
+      "tests": [
+        "tests/test_contract_assets.py::test_master_goal_rejects_semantic_contradictions"
+      ],
+      "coupling": "host-neutral",
+      "loc": 2,
+      "g1_hint": "keep: G1 rules must run identically on any host."
+    },
+    {
+      "id": "GOV-27",
+      "name": "Always-read instruction budget",
+      "statement": "The always-loaded agent instruction file is capped at 2048 bytes to bound per-turn context and interpretation cost.",
+      "mechanism": "check_agents fails the contract check when AGENTS.md exceeds 2048 bytes.",
+      "threat": "principle",
+      "refs": [
+        "scripts/check_contracts.py:80",
+        "scripts/check_contracts.py:86"
+      ],
+      "tests": [
+        "tests/test_contract_assets.py::test_repository_control_contract_checker_passes"
+      ],
+      "coupling": "host-neutral",
+      "loc": 8,
+      "g1_hint": "keep: cap G1's injected instructions per turn."
+    },
+    {
+      "id": "GOV-28",
+      "name": "Stdlib-only with zero runtime dependencies",
+      "statement": "Production code depends only on the language standard library plus Git, and the dependency list is pinned empty by test.",
+      "mechanism": "pyproject dependencies = [] asserted by the anchor test; README declares Python 3.11+ and Git only.",
+      "threat": "principle",
+      "refs": [
+        "README.md:8",
+        "pyproject.toml:10",
+        "tests/test_contract_assets.py:86"
+      ],
+      "tests": [
+        "tests/test_contract_assets.py::test_master_goal_valid_structure_and_runtime_anchors_are_unchanged"
+      ],
+      "coupling": "git",
+      "loc": 1,
+      "g1_hint": "modify: keep the zero-dependency discipline in G1's own runtime language."
+    },
+    {
+      "id": "GOV-29",
+      "name": "Exactly one active task",
+      "statement": "At most one task is active; more than one is a typed current_task_ambiguous error, and pending/blocked tasks stay parked and unprojected.",
+      "mechanism": "Plan parser and every surface fail closed on multiple actives; activation and begin are serialized under the ledger lock with typed losers.",
+      "threat": "principle",
+      "refs": [
+        "README.md:24",
+        "README.md:26",
+        "T1_MASTER_GOAL.md:84"
+      ],
+      "tests": [
+        "tests/test_core_isolation.py::test_multiple_active_tasks_fail_with_typed_ambiguity",
+        "tests/test_completion_boundary_remediation_2.py::test_concurrent_activation_has_one_success_one_zero_write_typed_loser"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: one active claim surface keeps attribution unambiguous."
+    },
+    {
+      "id": "GOV-30",
+      "name": "Explicit scoped idempotent invalidation",
+      "statement": "Retraction is explicit: one reason-bearing invalidation record per task, appended without running commands or rewriting evidence, idempotent and task-scoped.",
+      "mechanism": "harnessctl task invalidate appends task_invalidated under the exclusive lock after an in-lock existence check; completion then fails with VERIFICATION_INVALIDATED.",
+      "threat": "principle",
+      "refs": [
+        "README.md:28",
+        "README.md:34"
+      ],
+      "tests": [
+        "tests/test_core_isolation.py::test_task_invalidate_is_single_event_idempotent_and_task_scoped",
+        "tests/test_optional_core_trim.py::test_concurrent_identical_invalidation_is_one_atomic_event"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: G1 needs an append-only retraction instead of edits."
+    },
+    {
+      "id": "GOV-31",
+      "name": "Weaker evidence labelled, never upgraded",
+      "statement": "Evidence lacking a binding is labelled as such (legacy-output-unbound, legacy-prefix, null tri-state) and never presented as bound or as current-repository verification.",
+      "mechanism": "Reports expose completion_binding and evidence_mode fields; the report skill forbids presenting historical completion as current verification.",
+      "threat": "principle",
+      "refs": [
+        "README.md:42",
+        "README.md:48",
+        ".agents/skills/report/SKILL.md:27"
+      ],
+      "tests": [
+        "tests/test_core_isolation.py::test_legacy_manifest_is_explicitly_manifest_unbound",
+        "tests/test_completion_boundary_remediation_2.py::test_legacy_manifest_tri_state_including_unreadable_boundary"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: every G1 verdict should carry its binding strength."
+    },
+    {
+      "id": "GOV-32",
+      "name": "Hooks are read-only bounded projections",
+      "statement": "Host hooks only project bounded (512-byte) derived state, write nothing, fail open, and never intercept ordinary tool calls.",
+      "mechanism": "Generated manifest has only SessionStart with additionalContextLimit 512; projection errors become a systemMessage; zero-write proven by full-tree snapshots.",
+      "threat": "principle",
+      "refs": [
+        "README.md:52",
+        "README.md:55",
+        "README.md:59",
+        ".codex/hooks.json:8"
+      ],
+      "tests": [
+        "tests/test_core_isolation.py::test_session_start_is_zero_write_for_active_task",
+        "tests/test_contract_assets.py::test_generated_hook_manifest_has_exactly_one_event_and_no_drift"
+      ],
+      "coupling": "codex",
+      "loc": 166,
+      "g1_hint": "modify: G1 hooks may append to G1's own observation log but must not gate tools or mutate task state."
+    },
+    {
+      "id": "GOV-33",
+      "name": "Host trust observed, never inferred",
+      "statement": "Hook activation is reported from the host's own trust state (installed, trusted and active are distinct); automation never touches user trust and is labelled transport-only.",
+      "mechanism": "doctor --codex-hooks queries app-server hooks/list; smoke uses an isolated home and records normal_trust_activation_proven=false.",
+      "threat": "principle",
+      "refs": [
+        "README.md:63",
+        "README.md:72",
+        "docs/AUDIT.md:16"
+      ],
+      "tests": [
+        "tests/test_completion_boundary.py::test_installed_but_untrusted_hooks_are_not_reported_active",
+        "tests/test_doctor.py::test_doctor_distinguishes_untrusted_and_modified_hooks"
+      ],
+      "coupling": "codex",
+      "loc": 0,
+      "g1_hint": "modify: prove G1 is actually loaded in omp from observed events, never from config presence."
+    },
+    {
+      "id": "GOV-34",
+      "name": "Generated config is drift-checked",
+      "statement": "Host configuration is generated from code and verified byte-equal by a check mode; hand edits are drift failures.",
+      "mechanism": "render_hooks.py writes or --check compares the manifest; check_contracts also requires exactly one command hook per event sharing one executable wrapper.",
+      "threat": "principle",
+      "refs": [
+        "scripts/check_contracts.py:124",
+        ".codex/hooks.json:2",
+        "scripts/render_hooks.py:22"
+      ],
+      "tests": [
+        "tests/test_contract_assets.py::test_generated_hook_manifest_has_exactly_one_event_and_no_drift"
+      ],
+      "coupling": "codex",
+      "loc": 30,
+      "g1_hint": "keep: generate G1's omp extension config and diff it every run."
+    },
+    {
+      "id": "GOV-35",
+      "name": "Runtime state local; contract tracked",
+      "statement": "Ledger, head, pending journal, locks, evidence and private runtime are git-ignored local state, while the canonical plan must stay tracked.",
+      "mechanism": "check_ignore_contract runs git check-ignore on representative runtime paths and fails if .harness/plan.md is ignored.",
+      "threat": "principle",
+      "refs": [
+        "scripts/check_contracts.py:173",
+        "scripts/check_contracts.py:191",
+        ".gitignore:1"
+      ],
+      "tests": [
+        "tests/test_contract_assets.py::test_repository_control_contract_checker_passes"
+      ],
+      "coupling": "git",
+      "loc": 19,
+      "g1_hint": "modify: keep G1 evidence out of agent-committed paths; cross-host moves must carry it explicitly."
+    },
+    {
+      "id": "GOV-36",
+      "name": "Spec checked by structure and contradiction corpus",
+      "statement": "The normative spec is validated by a deterministic checker: 12 obligations each with MUST and one REJECT counterexample, numbered terminals, one spec file, semantic signatures and a forbidden-contradiction corpus.",
+      "mechanism": "master_goal_failures parses identity fields, kernel, obligations, terminals and exclusions; a parametrized corpus of contradictions must fail and smaller equivalent forms must pass.",
+      "threat": "principle",
+      "refs": [
+        "scripts/check_contracts.py:195",
+        "scripts/check_contracts.py:214",
+        "scripts/check_contracts.py:28",
+        "scripts/check_contracts.py:256"
+      ],
+      "tests": [
+        "tests/test_contract_assets.py::test_master_goal_rejects_semantic_contradictions",
+        "tests/test_contract_assets.py::test_master_goal_accepts_equivalent_smaller_forms"
+      ],
+      "coupling": "host-neutral",
+      "loc": 83,
+      "g1_hint": "modify: reuse the negative/positive corpus pattern but treat it as a bounded oracle (THR-33)."
+    },
+    {
+      "id": "GOV-37",
+      "name": "Frozen anchor tripwires",
+      "statement": "Tests pin exact digests of protected assets (core tree, adapter, host config), the event-type set, the empty dependency list and the single lock so any change must be explicit.",
+      "mechanism": "Anchor test compares sha256/path-tree digests and constant sets; changing a protected file requires updating the literal in the same reviewed change.",
+      "threat": "principle",
+      "refs": [
+        "tests/test_contract_assets.py:65",
+        "tests/test_contract_assets.py:76",
+        "T1_ACTIVE_TURN_PROGRESS_DELTA_REMEDIATION_2_REAUDIT.md:572"
+      ],
+      "tests": [
+        "tests/test_contract_assets.py::test_master_goal_valid_structure_and_runtime_anchors_are_unchanged"
+      ],
+      "coupling": "host-neutral",
+      "loc": 25,
+      "g1_hint": "modify: anchor G1's verifier, but keep pins outside the agent-writable tree (see findings)."
+    },
+    {
+      "id": "GOV-38",
+      "name": "Independent reproduce-first re-audit",
+      "statement": "Every task is re-audited by a non-implementer from a fresh session that treats the report as claims, reproduces each claim in isolated copies with empty HOME, and leaves the original untouched.",
+      "mechanism": "Each audit records auditor role, authority order, isolation method and a claim-to-evidence matrix; only the audit file itself is added to the repo.",
+      "threat": "principle",
+      "refs": [
+        "CODEX_ROOT_HARNESS_POST_IMPLEMENTATION_AUDIT.md:3",
+        "CODEX_ROOT_HARNESS_POST_IMPLEMENTATION_AUDIT.md:6",
+        "T1_LEDGER_CANONICALITY_REAUDIT.md:3",
+        "T1_STATELESS_FRESH_TURN_REAUDIT.md:3"
+      ],
+      "tests": [],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: G1 audits run in separate sessions with no shared context with the implementer."
+    },
+    {
+      "id": "GOV-39",
+      "name": "Evidence classes with attestation ceiling",
+      "statement": "Classify evidence as user-observed, host-observed, repository-bound, runtime-reproducible or not reconstructible, rank code and canonical state above reports, and never claim beyond the class.",
+      "mechanism": "Audits emit graded verdicts (PROVEN vs STRONGLY_SUPPORTED vs CONFIGURED_ONLY); deterministic code wins where prose and runtime differ.",
+      "threat": "principle",
+      "refs": [
+        "T1_LOGICAL_SESSION_E2E_RETRY_REAUDIT.md:40",
+        "T1_LOGICAL_SESSION_E2E_RETRY_REAUDIT.md:48",
+        "T1_MULTI_TASK_GOAL_LOOP_NATIVE_E2E_REAUDIT.md:56",
+        "docs/AUDIT.md:20"
+      ],
+      "tests": [],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: G1 records should carry an evidence-class field."
+    },
+    {
+      "id": "GOV-40",
+      "name": "Report frozen before verification",
+      "statement": "The task report is frozen before Public Verify and hashed as an artifact into the success receipt; explicit completion must post-date it and bind that receipt.",
+      "mechanism": "Auditors check mtime ordering report < verification_started < verification_succeeded < complete and that the report sha256 equals the receipt artifact hash.",
+      "threat": "principle",
+      "refs": [
+        "T1_COMPLETION_BOUNDARY_HARDENING_REAUDIT.md:35",
+        "T1_COMPLETION_BOUNDARY_REMEDIATION_2_REAUDIT.md:37",
+        "T1_LOGICAL_SESSION_E2E_RETRY_REAUDIT.md:14"
+      ],
+      "tests": [],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: an agent-written summary is just another hashed artifact, not a claim channel."
+    },
+    {
+      "id": "GOV-41",
+      "name": "Failed attempts preserved as negative evidence",
+      "statement": "Failed verification attempts stay immutable in the ledger as negative evidence; remediation proceeds by a new attempt, never by rewriting history.",
+      "mechanism": "verification_failed records remain chained; re-audits confirm prior failed attempts are intact and distinct from the successful receipt.",
+      "threat": "principle",
+      "refs": [
+        "T1_MULTI_TASK_GOAL_LOOP_REAUDIT.md:141",
+        "T1_NO_ACTIVE_SELECTION_BOUNDARY_REAUDIT.md:136"
+      ],
+      "tests": [
+        "tests/test_ledger_canonicality.py::test_failed_logical_session_e2e_remains_frozen"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep."
+    },
+    {
+      "id": "THR-01",
+      "name": "Worker writes harness canonical state",
+      "statement": "An agent/delegate with write access can tamper with harness-owned state (oracle, evidence, ledger) undetected when that state is inside its writable area or outside the integrity snapshot, or when isolation is a trusted boolean rather than proof.",
+      "mechanism": "Workspaces moved outside root (mkdtemp plus _assert_external), write delegation disabled pending real confinement, tamper made typed; the whole route/delegate subsystem was later deleted.",
+      "threat": "Delegate wrote ../../private/oracle.json and still returned status verified (P1); write_isolation=True flag trusted without proof (P3).",
+      "refs": [
+        "CODEX_ROOT_HARNESS_POST_IMPLEMENTATION_AUDIT.md:52",
+        "CODEX_ROOT_HARNESS_REMEDIATION_REAUDIT.md:59",
+        "CODEX_ROOT_HARNESS_REMEDIATION_REAUDIT.md:97",
+        "T1_CORE_ISOLATION_REAUDIT.md:31"
+      ],
+      "tests": [
+        "tests/test_core_isolation.py::test_removed_subsystem_files_commands_skills_and_schema_are_absent"
+      ],
+      "coupling": "posix",
+      "loc": 0,
+      "g1_hint": "keep: omp's agent can write anything its user can, so G1's evidence store must be outside its reach or hash-anchored externally."
+    },
+    {
+      "id": "THR-02",
+      "name": "Completion trusted self-reported exit code",
+      "statement": "A completion gate that trusts a manifest's self-reported exit_code lets a one-integer edit turn a failed verification into completion.",
+      "mechanism": "Completion requires the root-appended verification_succeeded receipt bound to contract and manifest hashes; plan, report, hooks and loops share one evaluator.",
+      "threat": "Editing exit_code 1 to 0 passed plan --status complete, report --require-complete and the Stop gate (P1).",
+      "refs": [
+        "CODEX_ROOT_HARNESS_POST_IMPLEMENTATION_AUDIT.md:63",
+        "CODEX_ROOT_HARNESS_REMEDIATION_REAUDIT.md:60"
+      ],
+      "tests": [
+        "tests/test_security_core.py::test_manifest_exit_code_one_to_zero_forgery_cannot_complete",
+        "tests/test_security_core.py::test_completion_and_report_reject_the_same_forged_manifest",
+        "tests/test_security_core.py::test_verification_failed_only_never_completes"
+      ],
+      "coupling": "host-neutral",
+      "loc": 537,
+      "g1_hint": "keep: G1 computes success only from the exit status it observed itself."
+    },
+    {
+      "id": "THR-03",
+      "name": "Evidence fields recorded but never bound",
+      "statement": "Evidence fields that are recorded but never recomputed or hash-bound (tree hash, timestamp, stdout/stderr content) accept forged values.",
+      "mechanism": "Completion recomputes source digest and git tree, binds receipt and manifest timestamps, and schema-3 manifests carry stdout/stderr SHA-256 repeated in the receipt.",
+      "threat": "Fake git_tree_hash 'deadbeef', a 1999 timestamp and edited command.stdout were all accepted (P2/P3).",
+      "refs": [
+        "CODEX_ROOT_HARNESS_POST_IMPLEMENTATION_AUDIT.md:71",
+        "CODEX_ROOT_HARNESS_POST_IMPLEMENTATION_AUDIT.md:131",
+        "T1_CONTROL_PLANE_REDUCTION_REAUDIT.md:281"
+      ],
+      "tests": [
+        "tests/test_security_core.py::test_no_head_snapshot_hash_is_authoritative",
+        "tests/test_security_core.py::test_source_mutation_after_success_invalidates_receipt",
+        "tests/test_core_isolation.py::test_new_command_output_content_mutation_is_detected"
+      ],
+      "coupling": "git",
+      "loc": 0,
+      "g1_hint": "keep: every evidence field must be recomputed by G1 or bound by a hash G1 computed."
+    },
+    {
+      "id": "THR-04",
+      "name": "Secrets and private oracles leak into evidence",
+      "statement": "Verification commands inheriting the full environment and world-readable evidence files leak secrets and private oracle commands/outputs into shareable evidence.",
+      "mechanism": "Public evidence records digests/results only, files are 0600 in 0700 dirs, verify runs with a scrubbed sterile HOME/TMP and secret redaction; the oracle path was later deleted.",
+      "threat": "Oracle command and stdout appeared in a 0644 manifest; an echoed env secret landed in command.stdout (P2/P3).",
+      "refs": [
+        "CODEX_ROOT_HARNESS_POST_IMPLEMENTATION_AUDIT.md:83",
+        "CODEX_ROOT_HARNESS_POST_IMPLEMENTATION_AUDIT.md:119",
+        "CODEX_ROOT_HARNESS_REMEDIATION_REAUDIT.md:31",
+        "src/codex_harness/util.py:650"
+      ],
+      "tests": [
+        "tests/test_security_core.py::test_parent_secrets_never_enter_public_evidence"
+      ],
+      "coupling": "posix",
+      "loc": 43,
+      "g1_hint": "keep: G1 command capture must scrub env and restrict file modes."
+    },
+    {
+      "id": "THR-05",
+      "name": "Untyped exceptions escape the gates",
+      "statement": "Tamper, lock, decode or permission failures that surface as raw exceptions instead of typed fail-closed codes break uniform handling and can hide every task's result.",
+      "mechanism": "Errors normalized to HarnessError codes (ledger_lock_io, ledger_corrupt, EVIDENCE_IO, invalid_manifest) per task, with one core code across all surfaces.",
+      "threat": "Uncaught HarnessError/PermissionError/RecursionError/ValueError turned the whole report into internal_error or a traceback (P2-P4).",
+      "refs": [
+        "CODEX_ROOT_HARNESS_POST_IMPLEMENTATION_AUDIT.md:89",
+        "CODEX_ROOT_HARNESS_POST_IMPLEMENTATION_AUDIT.md:113",
+        "CODEX_ROOT_HARNESS_LEDGER_V2_REAUDIT.md:338",
+        "T1_OPTIONAL_CORE_TRIM_REAUDIT.md:366",
+        "T1_LEDGER_CANONICALITY_REAUDIT.md:515",
+        "T1_MULTI_TASK_GOAL_LOOP_NATIVE_E2E_REAUDIT.md:229"
+      ],
+      "tests": [
+        "tests/test_security_core.py::test_ledger_open_io_errors_are_normalized",
+        "tests/test_ledger_v2.py::test_cli_normalizes_corrupt_ledger_without_traceback",
+        "tests/test_ledger_canonicality.py::test_malformed_state_has_one_core_code_across_surfaces",
+        "tests/test_ledger_canonicality.py::test_manifest_parser_data_failures_are_per_task_typed_and_zero_write"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: G1 verdicts form a closed typed alphabet; anything else maps to a typed fail-closed error."
+    },
+    {
+      "id": "THR-06",
+      "name": "Bypass-validated activation claims",
+      "statement": "Protection validated only through bypass paths (trust-bypass smoke, disabled production hooks) gets claimed as active protection while the real path never ran.",
+      "mechanism": "Doctor separates installed/trusted/active and never reports untrusted hooks active; smoke is labelled transport-only with normal_trust_activation_proven=false; README requires manual trust review.",
+      "threat": "Hooks silently inactive until trusted (P1); fixed PreToolUse never ran in production yet 'production failure fixed' was claimed (P2).",
+      "refs": [
+        "CODEX_ROOT_HARNESS_POST_IMPLEMENTATION_AUDIT.md:95",
+        "T1_CONTROL_PLANE_MINIMALITY_AUDIT.md:30",
+        "T1_CONTROL_PLANE_MINIMALITY_AUDIT.md:67",
+        "T1_CORE_ISOLATION_REAUDIT.md:38"
+      ],
+      "tests": [
+        "tests/test_completion_boundary.py::test_installed_but_untrusted_hooks_are_not_reported_active",
+        "tests/test_doctor.py::test_doctor_distinguishes_untrusted_and_modified_hooks"
+      ],
+      "coupling": "codex",
+      "loc": 0,
+      "g1_hint": "keep: G1 must prove its activation from observed omp events and label test-only paths as such."
+    },
+    {
+      "id": "THR-07",
+      "name": "Trust hash excludes executed code",
+      "statement": "Host trust that hashes only the hook handler definition lets changes to transitively imported harness code alter hook behavior without re-approval.",
+      "mechanism": "Not mitigated (host-owned); recorded as a limitation and deferred.",
+      "threat": "Codex trust covers the command/wrapper, not src/codex_harness imports, so source edits silently change trusted hook behavior.",
+      "refs": [
+        "T1_STOP_HOOK_REDUCTION_REAUDIT.md:349",
+        "T1_SESSIONSTART_ACTIVE_ONLY_REDUCTION_REAUDIT.md:219",
+        "T1_SESSIONSTART_ACTIVE_ONLY_REDUCTION_REAUDIT.md:318"
+      ],
+      "tests": [],
+      "coupling": "codex",
+      "loc": 0,
+      "g1_hint": "modify: G1 should hash its own loaded code and stamp that digest on every verdict."
+    },
+    {
+      "id": "THR-08",
+      "name": "Symlink, hardlink and TOCTOU file swaps",
+      "statement": "Path checks separated from use, or missing symlink/hardlink/inode checks, let an attacker redirect canonical writes or make the harness hash a different file.",
+      "mechanism": "O_NOFOLLOW opens with lstat/fstat inode agreement, dir-fd component walks with fd-based hashing, and single-link regular-file checks for ledger metadata and outputs.",
+      "threat": "ledger.jsonl symlink wrote outside the repo; a symlink swap between check and hash; lock inode replacement; manifest hardlink accepted (P3/P4).",
+      "refs": [
+        "CODEX_ROOT_HARNESS_POST_IMPLEMENTATION_AUDIT.md:107",
+        "CODEX_ROOT_HARNESS_POST_IMPLEMENTATION_AUDIT.md:137",
+        "CODEX_ROOT_HARNESS_LEDGER_V2_REAUDIT.md:363",
+        "T1_COMPLETION_BOUNDARY_REMEDIATION_2_REAUDIT.md:405"
+      ],
+      "tests": [
+        "tests/test_security_core.py::test_ledger_and_lock_symlinks_are_rejected",
+        "tests/test_security_core.py::test_fd_hashing_rejects_symlink_swap_between_lookup_and_open",
+        "tests/test_ledger_v2.py::test_ledger_metadata_hardlinks_are_rejected",
+        "tests/test_evidence.py::test_symlink_escape_is_rejected"
+      ],
+      "coupling": "posix",
+      "loc": 130,
+      "g1_hint": "keep: open agent-controlled files no-follow and hash via the opened descriptor."
+    },
+    {
+      "id": "THR-09",
+      "name": "History rollback or erasure goes undetected",
+      "statement": "A self-validating hash chain without an external anchor or loss detection accepts a truncated prefix or a silently re-created empty ledger, reviving invalidated completions or erasing history.",
+      "mechanism": "Ledger v2 head anchor (ledger_id, last seq, record hash, end offset) checked on every surface; pristine vs lost state distinguished by durable traces, genesis only via explicit task begin.",
+      "threat": "Deleting the invalidation line revived completion; deleting ledger+head silently re-genesised and erased invalidations (P2).",
+      "refs": [
+        "CODEX_ROOT_HARNESS_REMEDIATION_REAUDIT.md:80",
+        "CODEX_ROOT_HARNESS_LEDGER_V2_REAUDIT.md:27",
+        "CODEX_ROOT_HARNESS_LEDGER_V2_REAUDIT.md:314",
+        "T1_CONTROL_PLANE_REDUCTION_REAUDIT.md:289",
+        "T1_CORE_ISOLATION_REAUDIT.md:375"
+      ],
+      "tests": [
+        "tests/test_ledger_v2.py::test_tail_invalidation_deletion_never_revives_completion",
+        "tests/test_ledger_v2.py::test_replacing_ledger_with_an_older_valid_prefix_is_detected",
+        "tests/test_ledger_v2.py::test_rolling_back_only_anchor_is_detected",
+        "tests/test_ledger_canonicality.py::test_both_missing_with_durable_trace_fails_closed_zero_repair",
+        "tests/test_ledger_canonicality.py::test_lost_state_is_typed_across_every_surface_without_repair"
+      ],
+      "coupling": "posix",
+      "loc": 0,
+      "g1_hint": "modify: keep the anchor, but place it where the agent cannot write (T1's head is same-user writable)."
+    },
+    {
+      "id": "THR-10",
+      "name": "Superlinear ledger cost blocks availability",
+      "statement": "Re-validating the whole hash chain on every append makes append O(n^2) and sessions O(n^3), turning normal growth into a denial of service.",
+      "mechanism": "Ledger v2 appends read only the tail via the head anchor (constant parse/hash/fsync work); full verification stays O(n).",
+      "threat": "Single append took 687 ms at 500 records and 10k records exceeded 5 minutes (P2; severity first understated as P3).",
+      "refs": [
+        "CODEX_ROOT_HARNESS_POST_IMPLEMENTATION_AUDIT.md:125",
+        "CODEX_ROOT_HARNESS_REMEDIATION_REAUDIT.md:87",
+        "CODEX_ROOT_HARNESS_LEDGER_V2_REAUDIT.md:28"
+      ],
+      "tests": [
+        "tests/test_ledger_v2.py::test_append_does_not_call_full_read",
+        "tests/test_ledger_v2.py::test_append_existing_record_work_is_constant",
+        "tests/test_ledger_v2.py::test_ten_thousand_record_complexity_benchmark_completes"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: benchmark G1's evidence log at 10k+ records."
+    },
+    {
+      "id": "THR-11",
+      "name": "Surfaces disagree on the same state",
+      "statement": "When different surfaces (stop gate, report, plan, hooks) evaluate different task subsets or logic, one surface passes what another blocks.",
+      "mechanism": "A single completion evaluator and one global integrity issue shared by report, doctor, plan and adapters; the Stop hook was ultimately deleted.",
+      "threat": "Stop checked only tasks[0] and returned continue:true while report blocked another task's invalidation (P2).",
+      "refs": [
+        "CODEX_ROOT_HARNESS_LEDGER_V2_REAUDIT.md:321",
+        "T1_LEDGER_CANONICALITY_REAUDIT.md:24"
+      ],
+      "tests": [
+        "tests/test_ledger_canonicality.py::test_malformed_state_has_one_core_code_across_surfaces",
+        "tests/test_completion_boundary.py::test_multiple_historical_integrity_regressions_emit_one_global_issue"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: one verdict function, many projections."
+    },
+    {
+      "id": "THR-12",
+      "name": "Non-canonical encodings cause parser divergence",
+      "statement": "Accepting duplicate keys, NaN/Infinity, bool-as-int, alternate spellings or unbounded sizes lets two parsers read the same bytes differently and lets oversized records strand recovery.",
+      "mechanism": "Single bytes-first strict decoder, writer-derived canonical byte equality, exact int types, and exact record/head/pending size limits checked before any write.",
+      "threat": "A duplicate-key line read as a forged payload by first-wins parsers; NaN appended; a 3.2 MB payload left a permanently unrecoverable pending journal (P3).",
+      "refs": [
+        "CODEX_ROOT_HARNESS_LEDGER_V2_REAUDIT.md:328",
+        "CODEX_ROOT_HARNESS_LEDGER_V2_REAUDIT.md:333",
+        "CODEX_ROOT_HARNESS_LEDGER_V2_REAUDIT.md:348",
+        "T1_LEDGER_CANONICALITY_REAUDIT.md:515"
+      ],
+      "tests": [
+        "tests/test_ledger_canonicality.py::test_strict_json_and_line_representation_rejected_unchanged",
+        "tests/test_ledger_canonicality.py::test_invalid_utf8_duplicate_nested_and_alternate_order",
+        "tests/test_ledger_canonicality.py::test_record_integer_fields_are_exact",
+        "tests/test_ledger_canonicality.py::test_exact_pending_limit_plus_one_and_padding_boundaries"
+      ],
+      "coupling": "host-neutral",
+      "loc": 1030,
+      "g1_hint": "keep: hash exact canonical bytes and reject anything a second parser could read differently."
+    },
+    {
+      "id": "THR-13",
+      "name": "Lock liveness and identity hazards",
+      "statement": "Blocking locks without timeout, lock files replaceable by inode swap, and lock-free status reads cause indefinite hangs, lost mutual exclusion or false alarms.",
+      "mechanism": "Partially mitigated: one canonical flock with open-time no-follow/inode checks and shared-lock reads; the flock still blocks without timeout and there is no post-acquire inode recheck.",
+      "threat": "A SIGSTOPped holder hangs every surface; rm+touch of ledger.lock let two writers append seq 2 (P3).",
+      "refs": [
+        "CODEX_ROOT_HARNESS_LEDGER_V2_REAUDIT.md:353",
+        "CODEX_ROOT_HARNESS_LEDGER_V2_REAUDIT.md:358",
+        "CODEX_ROOT_HARNESS_LEDGER_V2_REAUDIT.md:363",
+        "src/codex_harness/ledger.py:1460"
+      ],
+      "tests": [],
+      "coupling": "posix",
+      "loc": 70,
+      "g1_hint": "modify: use bounded lock waits and verify lock identity after acquisition."
+    },
+    {
+      "id": "THR-14",
+      "name": "Environment override redirects canonical writes",
+      "statement": "Root discovery that prefers an environment variable over the event's working directory or explicit root lets a write land in a different repository.",
+      "mechanism": "Hook root derived from the wrapper's own file path (symlink boundary refused) plus an event-cwd Git-root check; HARNESS_ROOT redirection removed and smoke runs with a scrubbed env.",
+      "threat": "HARNESS_ROOT=A with cwd B appended hook events into A; smoke children inherited HARNESS_ROOT (P3).",
+      "refs": [
+        "CODEX_ROOT_HARNESS_LEDGER_V2_REAUDIT.md:343",
+        "T1_CONTROL_PLANE_REDUCTION_REAUDIT.md:283",
+        ".codex/hooks/harness_hook.py:12"
+      ],
+      "tests": [
+        "tests/test_completion_boundary.py::test_harness_root_environment_cannot_redirect_session_start",
+        "tests/test_completion_boundary.py::test_explicit_hook_root_mismatch_is_read_only",
+        "tests/test_completion_boundary.py::test_symlinked_hook_root_is_rejected_read_only"
+      ],
+      "coupling": "git",
+      "loc": 22,
+      "g1_hint": "keep: derive the workspace root from observed facts, never from agent-settable env."
+    },
+    {
+      "id": "THR-15",
+      "name": "Residue and leaked resources pollute state",
+      "statement": "Leftover worktrees, temp files, caches, bytecode and stray copies accumulate and leak into digests or repo-wide scans, changing what gets verified.",
+      "mechanism": "Cleanup in finally on all outcomes, -B/PYTHONDONTWRITEBYTECODE, --no-cache lint, digest exclusions, residue-absence tests and per-test fixture teardown.",
+      "threat": "Orphan worktrees; .tmp files after crashes; .pyc from hooks; .ruff_cache from Public Verify; an in-repo sdcard/ draft copy entered source_digest; fixture trees broke the single-spec scan (P2-P4).",
+      "refs": [
+        "CODEX_ROOT_HARNESS_POST_IMPLEMENTATION_AUDIT.md:77",
+        "CODEX_ROOT_HARNESS_LEDGER_V2_REAUDIT.md:368",
+        "T1_CORE_ISOLATION_REAUDIT.md:373",
+        "T1_OPTIONAL_CORE_TRIM_REAUDIT.md:367",
+        "T1_MULTI_TASK_GOAL_LOOP_REAUDIT.md:141"
+      ],
+      "tests": [
+        "tests/test_optional_core_trim.py::test_proven_noncanonical_residue_is_absent",
+        "tests/test_ledger_canonicality.py::test_public_ruff_commands_create_no_cache",
+        "tests/test_core_isolation.py::test_hook_wrapper_creates_no_bytecode_or_cache"
+      ],
+      "coupling": "posix",
+      "loc": 0,
+      "g1_hint": "keep: snapshot the workspace before/after G1 actions and fail on unexplained residue."
+    },
+    {
+      "id": "THR-16",
+      "name": "Tool-gating hook blocks its own lifecycle",
+      "statement": "A pre-tool gating hook with a shell classifier denies legitimate verification and lifecycle commands, blocks subagents and reimplements native approvals.",
+      "mechanism": "PreToolUse, the 474-LOC side-effect classifier and approval regexes were deleted; the generated manifest has SessionStart only and no ordinary-tool hook.",
+      "threat": "With an active task, pytest, ruff, verify and complete were denied (19/31); Agent/spawn_agent always denied (P1/P2).",
+      "refs": [
+        "T1_CONTROL_PLANE_MINIMALITY_AUDIT.md:64",
+        "T1_CONTROL_PLANE_MINIMALITY_AUDIT.md:66",
+        "T1_CONTROL_PLANE_MINIMALITY_AUDIT.md:32"
+      ],
+      "tests": [
+        "tests/test_contract_assets.py::test_generated_hook_manifest_has_exactly_one_event_and_no_drift",
+        "tests/test_core_isolation.py::test_no_context_rollover_or_native_tool_interception_was_added"
+      ],
+      "coupling": "codex",
+      "loc": 0,
+      "g1_hint": "keep: G1 observes tool calls instead of vetoing them; vetoes self-DoS the harness."
+    },
+    {
+      "id": "THR-17",
+      "name": "Non-authoritative events enter canonical history",
+      "statement": "Telemetry, denial, advisory-hook or retired events written to (or replayed into) the canonical ledger get misread as invalidations and pollute authority.",
+      "mechanism": "Writer allowlist of 7 current event types enforced on append and on pending replay; hooks are zero-write; retired events stay readable but inert.",
+      "threat": "A denied, never-run command logged as pretool_blocked invalidated a valid verification (P1); ledger recover committed a retired codex_takeover (P4).",
+      "refs": [
+        "T1_CONTROL_PLANE_MINIMALITY_AUDIT.md:65",
+        "T1_CONTROL_PLANE_MINIMALITY_AUDIT.md:68",
+        "T1_CONTROL_PLANE_MINIMALITY_AUDIT.md:72",
+        "T1_LEDGER_CANONICALITY_REAUDIT.md:514"
+      ],
+      "tests": [
+        "tests/test_core_isolation.py::test_production_writer_set_is_minimal_and_removed_events_have_no_writer",
+        "tests/test_security_core.py::test_unknown_retired_event_writer_is_rejected_and_inert",
+        "tests/test_ledger_canonicality.py::test_noncurrent_pending_event_is_typed_corrupt_and_zero_write"
+      ],
+      "coupling": "host-neutral",
+      "loc": 20,
+      "g1_hint": "keep: separate G1's tool-call observation log from its verdict ledger; only verdict events change authority."
+    },
+    {
+      "id": "THR-18",
+      "name": "Historical validity tied to current source",
+      "statement": "Requiring every past completion to match the current source makes any unrelated edit invalidate all history and forces endless re-verification.",
+      "mechanism": "Historical completion is evaluated against its recorded receipt (immutable snapshot); only the current task is checked against current source (require_current).",
+      "threat": "Adding one unrelated file flipped four completed tasks to SOURCE_CHANGED; 9 of 16 verifications were re-verifications.",
+      "refs": [
+        "T1_CONTROL_PLANE_MINIMALITY_AUDIT.md:34",
+        "T1_CONTROL_PLANE_MINIMALITY_AUDIT.md:193",
+        "T1_CONTROL_PLANE_REDUCTION_REAUDIT.md:35"
+      ],
+      "tests": [
+        "tests/test_ledger_canonicality.py::test_frozen_existing_prefix_and_historical_completion_compatibility"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: distinguish 'verified at receipt' from 'valid now'."
+    },
+    {
+      "id": "THR-19",
+      "name": "Turn-end gate forces unwanted continuation",
+      "statement": "A stop/turn-end hook that blocks while criteria are incomplete forces extra model continuations, nags parked tasks and breaks intentional pause or context-clear boundaries.",
+      "mechanism": "Stop was shown to own no unique invariant and was physically deleted; projection is SessionStart-only and parked tasks are not projected.",
+      "threat": "A trusted Stop hook forced a continuation at a clear gate (STOP_HOOK_ROTATION_CONFLICT) and failed the E2E; Stop appended unbounded records (P3).",
+      "refs": [
+        "T1_LOGICAL_SESSION_E2E_REPORT.md:5",
+        "T1_STOP_HOOK_REDUCTION_REAUDIT.md:117",
+        "T1_CONTROL_PLANE_REDUCTION_REAUDIT.md:290",
+        "T1_CONTROL_PLANE_MINIMALITY_AUDIT.md:70"
+      ],
+      "tests": [
+        "tests/test_completion_boundary.py::test_turn_boundary_and_unknown_event_leave_active_task_durable",
+        "tests/test_core_isolation.py::test_pending_and_blocked_tasks_are_not_projected"
+      ],
+      "coupling": "codex",
+      "loc": 0,
+      "g1_hint": "keep: G1 never forces an omp turn to continue; it only refuses completion claims."
+    },
+    {
+      "id": "THR-20",
+      "name": "Empty versus corrupt state confusion",
+      "statement": "Treating an empty plan as invalid breaks fresh bootstrap, while treating a corrupt or zero-byte plan as 'no tasks' yields vacuous success.",
+      "mechanism": "Zero-task template is valid and task begin creates the first contract; zero-byte/header-less plans are invalid; plan/ledger mismatch is reported; Goal completion is never derived from an empty report.",
+      "threat": "A placeholder task blocked every Stop in fresh repos (P2); a truncated plan read as 'no T1 tasks' passed Stop and report (P3).",
+      "refs": [
+        "T1_CONTROL_PLANE_REDUCTION_REAUDIT.md:279",
+        "T1_CORE_ISOLATION_REAUDIT.md:371",
+        "T1_LEDGER_CANONICALITY_REAUDIT.md:518",
+        "T1_MULTI_TASK_GOAL_LOOP_NATIVE_E2E_REAUDIT.md:130"
+      ],
+      "tests": [
+        "tests/test_core_isolation.py::test_template_seeded_fresh_repository_lifecycle_completes",
+        "tests/test_completion_boundary.py::test_zero_byte_and_missing_header_plans_are_invalid_but_template_is_valid",
+        "tests/test_completion_boundary.py::test_plan_ledger_mismatch_is_reported_without_reconstruction",
+        "tests/test_multi_task_goal_loop_native_e2e.py::test_zero_task_lifecycle_projection_is_not_goal_authority"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: 'nothing to check' must never be reported as 'checked and passed'."
+    },
+    {
+      "id": "THR-21",
+      "name": "Unbound or legacy completion paths",
+      "statement": "Completion transitions without explicit receipt binding (latest-success fallback, raw API append, migration import) let unrelated or later receipts satisfy completion or silently downgrade strict tasks.",
+      "mechanism": "New transitions must bind receipt seq and hash (completion_binding_required); legacy fallback is prefix-bounded; v1 migration was deleted and v1 input is typed unsupported.",
+      "threat": "A later bogus success changed history; Ledger.append wrote an unbound complete; ledger migrate manufactured a legacy completion (P3).",
+      "refs": [
+        "T1_CONTROL_PLANE_REDUCTION_REAUDIT.md:282",
+        "T1_CORE_ISOLATION_REAUDIT.md:366",
+        "T1_CORE_ISOLATION_REAUDIT.md:367",
+        "T1_COMPLETION_BOUNDARY_HARDENING_REAUDIT.md:346"
+      ],
+      "tests": [
+        "tests/test_completion_boundary.py::test_direct_unbound_and_partial_completion_appends_are_rejected_without_write",
+        "tests/test_core_isolation.py::test_new_completion_transition_always_binds_receipt",
+        "tests/test_optional_core_trim.py::test_v1_is_typed_unsupported_and_historical_v2_events_are_inert"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: every completion names the exact receipt it rests on."
+    },
+    {
+      "id": "THR-22",
+      "name": "Later attempts overwrite earlier evidence",
+      "statement": "Single-path evidence lets a new verify attempt overwrite earlier outputs, destroying a completed task's historical proof or a failed attempt's diagnostics.",
+      "mechanism": "verify refuses completed tasks (verification_refused_complete_task) at both plan-status and ledger-authority boundaries before any write; failed-attempt outputs are still overwritten (only digests survive).",
+      "threat": "Re-verifying a completed task made report --require-complete fail repo-wide with MANIFEST_CHANGED (P2); failed-attempt stdout lost (P3).",
+      "refs": [
+        "T1_CORE_ISOLATION_REAUDIT.md:365",
+        "T1_COMPLETION_BOUNDARY_HARDENING_REAUDIT.md:36",
+        "T1_CONTROL_PLANE_MINIMALITY_AUDIT.md:73",
+        "src/codex_harness/evidence.py:173"
+      ],
+      "tests": [
+        "tests/test_completion_boundary.py::test_completed_task_verify_is_typed_no_write_and_active_verify_still_works",
+        "tests/test_completion_boundary_remediation_2.py::test_authoritative_completion_rejects_verify_independent_of_contract"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "modify: make G1 evidence per-attempt and append-only so nothing is overwritten."
+    },
+    {
+      "id": "THR-23",
+      "name": "Check-then-act races outside the lock",
+      "statement": "Guards evaluated before acquiring the mutation lock can be passed by two racing processes, letting a loser overwrite evidence or duplicate records.",
+      "mechanism": "Frontier checks run under the single exclusive ledger lock (completion_binding_stale; verification_started refused after completion; invalidation read and append in one critical section).",
+      "threat": "A verify started inside complete's evaluate-to-append window overwrote the manifest (2/6 runs, P2); concurrent invalidations appended twice (P4).",
+      "refs": [
+        "T1_COMPLETION_BOUNDARY_HARDENING_REAUDIT.md:343",
+        "T1_COMPLETION_BOUNDARY_REMEDIATION_REAUDIT.md:35",
+        "T1_COMPLETION_BOUNDARY_REMEDIATION_2_REAUDIT.md:401"
+      ],
+      "tests": [
+        "tests/test_completion_boundary_remediation.py::test_verify_that_passed_plan_guard_is_refused_before_evidence_overwrite",
+        "tests/test_completion_boundary_remediation.py::test_verification_started_first_makes_paused_completion_stale_and_zero_write",
+        "tests/test_optional_core_trim.py::test_concurrent_identical_invalidation_is_one_atomic_event"
+      ],
+      "coupling": "posix",
+      "loc": 75,
+      "g1_hint": "keep: every G1 decision re-reads state under the same lock it writes under."
+    },
+    {
+      "id": "THR-24",
+      "name": "Terminal state bypassed by edits",
+      "statement": "Completed tasks can be silently reopened or rewritten when status changes or contract amendments are not terminal-checked on every mutation path.",
+      "mechanism": "complete-to-any transitions and amendments refused (task_reopen_refused); terminality holds if either plan status or the ledger transition says complete, including raw API appends.",
+      "threat": "plan --status active then verify replaced evidence and re-bound completion; --accept-contract-change on a completed task destroyed history (P3).",
+      "refs": [
+        "T1_COMPLETION_BOUNDARY_HARDENING_REAUDIT.md:344",
+        "T1_COMPLETION_BOUNDARY_REMEDIATION_REAUDIT.md:299",
+        "T1_COMPLETION_BOUNDARY_REMEDIATION_REAUDIT.md:304"
+      ],
+      "tests": [
+        "tests/test_completion_boundary_remediation.py::test_completed_status_is_terminal_typed_and_zero_write",
+        "tests/test_completion_boundary_remediation_2.py::test_completed_contract_acceptance_is_terminal_and_zero_write",
+        "tests/test_completion_boundary_remediation_2.py::test_ledger_complete_is_terminal_even_when_plan_still_active",
+        "tests/test_completion_boundary_remediation_2.py::test_raw_ledger_terminal_mutations_are_typed_and_zero_write"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: closed tasks are immutable; new work needs a new task."
+    },
+    {
+      "id": "THR-25",
+      "name": "False conflated with cannot tell",
+      "statement": "Reporting false for a check that could not run (missing hash, unreadable file) makes 'undetectable' indistinguishable from 'verified unchanged'.",
+      "mechanism": "historical_manifest_rewritten became tri-state true/false/null with manifest_binding_available exposed; hash or I/O failures yield null plus a typed code.",
+      "threat": "mvp's receipt lacked manifest_content_hash, so a rewritten manifest showed rewritten=false (P3).",
+      "refs": [
+        "T1_COMPLETION_BOUNDARY_HARDENING_REAUDIT.md:345",
+        "T1_COMPLETION_BOUNDARY_REMEDIATION_REAUDIT.md:302",
+        "T1_COMPLETION_BOUNDARY_REMEDIATION_2_REAUDIT.md:404"
+      ],
+      "tests": [
+        "tests/test_completion_boundary_remediation.py::test_legacy_manifest_rewrite_state_is_derived_tri_state_without_append",
+        "tests/test_completion_boundary_remediation_2.py::test_legacy_manifest_tri_state_including_unreadable_boundary"
+      ],
+      "coupling": "host-neutral",
+      "loc": 11,
+      "g1_hint": "keep: every G1 check result is pass/fail/unknown, never boolean."
+    },
+    {
+      "id": "THR-26",
+      "name": "Dual-write crash window strands state",
+      "statement": "A crash between two non-atomic writes (ledger append then plan replace) can leave a state that newly added guards refuse forever.",
+      "mechanism": "Idempotent self-recovery: a retry that finds an identical committed transition (same contract and receipt) only replaces the plan; non-complete statuses reconcile exactly once.",
+      "threat": "A kill after the complete append left ledger complete/plan active, refused by completion_binding_stale with no exit but contract amendment (P2 regression).",
+      "refs": [
+        "T1_COMPLETION_BOUNDARY_REMEDIATION_REAUDIT.md:297",
+        "T1_COMPLETION_BOUNDARY_REMEDIATION_REAUDIT.md:37",
+        "T1_COMPLETION_BOUNDARY_REMEDIATION_2_REAUDIT.md:402"
+      ],
+      "tests": [
+        "tests/test_completion_boundary_remediation_2.py::test_h1_nine_process_kill_points_converge_exactly_once",
+        "tests/test_completion_boundary_remediation_2.py::test_committed_completion_crashes_recover_without_another_transition",
+        "tests/test_ledger_canonicality.py::test_status_crash_boundaries_converge_without_duplicate"
+      ],
+      "coupling": "posix",
+      "loc": 9,
+      "g1_hint": "keep: inject kills between every pair of writes and require convergence."
+    },
+    {
+      "id": "THR-27",
+      "name": "Lost updates reported as success",
+      "statement": "Read-modify-replace file updates without a lock or compare-and-swap silently drop concurrent writers' changes while every caller reports success.",
+      "mechanism": "The single ledger.lock now spans plan replace plus ledger append for all cooperative writers; losers get typed zero-write conflicts.",
+      "threat": "Two concurrent activations both returned rc 0; the plan kept one while the ledger recorded both (P3).",
+      "refs": [
+        "T1_COMPLETION_BOUNDARY_REMEDIATION_REAUDIT.md:298",
+        "T1_COMPLETION_BOUNDARY_REMEDIATION_REAUDIT.md:39"
+      ],
+      "tests": [
+        "tests/test_completion_boundary_remediation_2.py::test_concurrent_activation_has_one_success_one_zero_write_typed_loser",
+        "tests/test_completion_boundary_remediation_2.py::test_concurrent_task_begin_adds_one_task_and_loser_is_zero_write",
+        "tests/test_completion_boundary_remediation_2.py::test_concurrent_mark_and_other_task_status_preserve_both_results"
+      ],
+      "coupling": "posix",
+      "loc": 405,
+      "g1_hint": "keep: one lock covers every co-dependent write."
+    },
+    {
+      "id": "THR-28",
+      "name": "Read-only surfaces that actually write",
+      "statement": "Status, report, hook or audit commands assumed read-only can still write (git objects, index.lock, bytecode, caches, smoke evidence), mutating what later checks see.",
+      "mechanism": "doctor/report never compute source/tree digests; hooks run with -B under zero-write snapshot tests; audits recommend GIT_OPTIONAL_LOCKS=0; remaining writes are documented.",
+      "threat": "An active Stop wrote loose git objects; resume --dry-run created objects; hooks wrote .pyc; a read-only git status created index.lock (P3/P4).",
+      "refs": [
+        "T1_CORE_ISOLATION_REAUDIT.md:369",
+        "T1_COMPLETION_BOUNDARY_HARDENING_REAUDIT.md:348",
+        "T1_CONTROL_PLANE_REDUCTION_REAUDIT.md:286",
+        "T1_LOGICAL_SESSION_E2E_RETRY_REAUDIT.md:411"
+      ],
+      "tests": [
+        "tests/test_completion_boundary.py::test_doctor_and_report_never_call_source_or_tree_digest",
+        "tests/test_completion_boundary.py::test_read_only_surfaces_add_no_git_objects_or_repository_bytes",
+        "tests/test_core_isolation.py::test_hook_wrapper_creates_no_bytecode_or_cache"
+      ],
+      "coupling": "git",
+      "loc": 0,
+      "g1_hint": "keep: verify read-only claims with before/after filesystem snapshots, including .git."
+    },
+    {
+      "id": "THR-29",
+      "name": "Verifier weakened during reduction",
+      "statement": "Deleting or loosening tests/checks while simplifying removes security coverage, and reports may still claim that coverage passes.",
+      "mechanism": "Re-audits diff test inventories against prior trees and restored the deleted boundary tests; O12 forbids weaker verifiers as gain; test-only fixes are checked for assertion weakening.",
+      "threat": "Five security-boundary tests vanished while the report said they 'continue to pass' (P3).",
+      "refs": [
+        "T1_CORE_ISOLATION_REAUDIT.md:370",
+        "T1_CORE_ISOLATION_REAUDIT.md:35",
+        "T1_MASTER_GOAL.md:56",
+        "T1_MULTI_TASK_GOAL_LOOP_REAUDIT.md:141"
+      ],
+      "tests": [
+        "tests/test_completion_boundary.py::test_explicit_hook_root_mismatch_is_read_only",
+        "tests/test_completion_boundary.py::test_report_is_read_only_and_ignores_inert_old_report_artifact"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: pin G1's test inventory and fail when a check disappears."
+    },
+    {
+      "id": "THR-30",
+      "name": "Tests depend on live mutable state",
+      "statement": "Tests that read live harness state (e.g., counting completed tasks) go red once the task under test completes, making every later Public Verify fail.",
+      "mechanism": "The test now asserts a frozen ID subset with exact receipts instead of a live count; the residual live-state read is documented.",
+      "threat": "The suite was 280/281 after the task's own completion; the implementer's '281 passed' held only pre-completion (P3).",
+      "refs": [
+        "T1_LEDGER_CANONICALITY_REAUDIT.md:513",
+        "T1_LEDGER_CANONICALITY_REAUDIT.md:41",
+        "T1_LEDGER_CANONICALITY_REMEDIATION_REAUDIT.md:313"
+      ],
+      "tests": [
+        "tests/test_ledger_canonicality.py::test_frozen_existing_prefix_and_historical_completion_compatibility"
+      ],
+      "coupling": "host-neutral",
+      "loc": 2,
+      "g1_hint": "keep: G1 acceptance tests must be hermetic or pinned to frozen IDs."
+    },
+    {
+      "id": "THR-31",
+      "name": "Caller overrides contract-declared evidence",
+      "statement": "Letting the verifier's caller substitute evidence targets (e.g., --artifact) lets completion succeed on artifacts the contract never declared.",
+      "mechanism": "The override was deleted; verify always hashes exactly the contract's Artifacts in order and records missing ones as typed verification failures.",
+      "threat": "verify --artifact other.txt then complete succeeded for a task declaring artifact.txt (P3, pre-existing).",
+      "refs": [
+        "T1_LEDGER_CANONICALITY_REAUDIT.md:516"
+      ],
+      "tests": [
+        "tests/test_ledger_canonicality.py::test_verify_cli_has_no_artifact_override_and_rejects_it_before_write",
+        "tests/test_ledger_canonicality.py::test_verify_api_has_no_artifact_override_parameter_and_is_zero_write",
+        "tests/test_ledger_canonicality.py::test_verify_binds_every_contract_artifact_and_not_an_existing_substitute"
+      ],
+      "coupling": "host-neutral",
+      "loc": 2,
+      "g1_hint": "keep: the agent never chooses which evidence G1 checks."
+    },
+    {
+      "id": "THR-32",
+      "name": "Unbounded scope accepted as bounded",
+      "statement": "Path validators that normalize '.' to an empty path accept the entire repository as a 'bounded' task scope.",
+      "mechanism": "Allowed paths with empty parts (root-equivalent) are rejected directly before a registration is accepted.",
+      "threat": "A selected task with Allowed path '.' claimed the whole repo and could declare protected files as artifacts (P2).",
+      "refs": [
+        "T1_NO_ACTIVE_SELECTION_BOUNDARY_REAUDIT.md:703",
+        "T1_SELECTION_OPERATION_BINDING_REAUDIT.md:736",
+        "src/codex_harness/util.py:274"
+      ],
+      "tests": [
+        "tests/test_no_active_selection.py::test_root_equivalent_allowed_paths_are_rejected_directly",
+        "tests/test_no_active_selection.py::test_root_scope_selection_fails_closed_without_history_rollback"
+      ],
+      "coupling": "host-neutral",
+      "loc": 1,
+      "g1_hint": "keep: canonicalize, then reject root-equivalent or escaping scopes."
+    },
+    {
+      "id": "THR-33",
+      "name": "Text-pattern oracles defeated by paraphrase",
+      "statement": "Keyword/regex checkers over prose (giant-task detection, spec contradiction corpus) are bounded oracles that paraphrased or gutted-but-consistent text passes.",
+      "mechanism": "Declared as bounded and left unremediated; real behavior is constrained by runtime gates (Public Verify, receipt binding, audits).",
+      "threat": "'Deliver the whole local release candidate end to end' passed the giant-task filter (P3); gutted obligation bodies pass the spec checker (P2-info).",
+      "refs": [
+        "T1_NO_ACTIVE_SELECTION_BOUNDARY_REAUDIT.md:724",
+        "T1_MASTER_GOAL_SPEC_COMPRESSION_REAUDIT.md:615"
+      ],
+      "tests": [
+        "tests/test_no_active_selection.py::test_invalid_selected_contracts_are_protocol_errors"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "drop: never rely on text matching of model output for safety; gate on executed evidence."
+    },
+    {
+      "id": "THR-34",
+      "name": "Claiming another process's operation",
+      "statement": "Attributing any observed new state change to 'my' invocation lets a run claim a registration caused by a peer or external writer.",
+      "mechanism": "Each launch generates a 128-bit nonce carried once in the prompt; selected only if the sole new task echoes it exactly, otherwise protocol_error with a null claim.",
+      "threat": "Two concurrent selectors both reported selected/task-beta though one child failed (P3); the nonce is correlation, not authentication (argv-visible).",
+      "refs": [
+        "T1_NO_ACTIVE_SELECTION_BOUNDARY_REAUDIT.md:738",
+        "T1_SELECTION_OPERATION_BINDING_REAUDIT.md:205",
+        "T1_SELECTION_OPERATION_BINDING_REAUDIT.md:695"
+      ],
+      "tests": [
+        "tests/test_no_active_selection.py::test_barrier_concurrency_attributes_only_the_winning_operation",
+        "tests/test_no_active_selection.py::test_external_writer_registration_is_never_attributed",
+        "tests/test_no_active_selection.py::test_operation_identifier_generation_uses_128_random_bits"
+      ],
+      "coupling": "host-neutral",
+      "loc": 30,
+      "g1_hint": "modify: attribute effects via G1's own recorded tool-call IDs, not a model-echoed nonce."
+    },
+    {
+      "id": "THR-35",
+      "name": "Goal completion by self-declared coverage",
+      "statement": "A final task whose contract merely declares it checked every terminal property can yield goal_complete if its Public Verify is weak.",
+      "mechanism": "goal_complete re-derives receipt currency and source/tree binding, but aggregate coverage is delegated to the final task's Public Verify and the P09/P10 audit gate (open).",
+      "threat": "A weak-but-textually-final completed task would report goal_complete (P3).",
+      "refs": [
+        "T1_NO_ACTIVE_SELECTION_BOUNDARY_REAUDIT.md:755"
+      ],
+      "tests": [
+        "tests/test_no_active_selection.py::test_goal_effect_without_explicit_terminal_evidence_is_rejected",
+        "tests/test_no_active_selection.py::test_current_receipt_bound_final_goal_verification_is_derived"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "modify: G1 maps each terminal property to a check it runs itself."
+    },
+    {
+      "id": "THR-36",
+      "name": "Digest blind to mode and file type",
+      "statement": "A source digest that omits executable bits or type tags misses meaningful changes (chmod +x, file/symlink swaps, symlink-to-dir) and misclassifies them as no progress.",
+      "mechanism": "source_digest entries bind type, content hash, size and executable bit (regular) or raw target hash (symlink) via lstat; FIFO/socket fail closed as unsupported_source_type.",
+      "threat": "chmod 0644 to 0755 and same-content file/symlink swaps were classified no_durable_progress (P2/P3).",
+      "refs": [
+        "T1_ACTIVE_TURN_PROGRESS_DELTA_REAUDIT.md:580",
+        "T1_ACTIVE_TURN_PROGRESS_DELTA_REAUDIT.md:606",
+        "T1_ACTIVE_TURN_PROGRESS_DELTA_REMEDIATION_REAUDIT.md:225",
+        "src/codex_harness/util.py:437"
+      ],
+      "tests": [
+        "tests/test_fresh_turn.py::test_executable_bit_delta_is_active",
+        "tests/test_fresh_turn.py::test_file_type_delta_is_active",
+        "tests/test_fresh_turn.py::test_unsupported_source_entry_fails_closed",
+        "tests/test_security_core.py::test_source_digest_has_an_exact_type_and_executable_identity_vector"
+      ],
+      "coupling": "posix",
+      "loc": 40,
+      "g1_hint": "keep: G1's workspace fingerprint includes type and exec bit and fails on special files."
+    },
+    {
+      "id": "THR-37",
+      "name": "Out-of-band tampering reported as clean",
+      "statement": "Direct edits to completed or parked task records (criteria, objective, status resurrection) leave report/doctor clean when integrity checks skip non-current tasks or short-circuit on the active branch.",
+      "mechanism": "One global historical_task_integrity_regression compares every task's contract anchor, recorded completion and latest status anchor, including the active task; adapters fail closed before launch.",
+      "threat": "Flipping a completed criterion [x] to [ ] and editing Status: complete to active stayed silent (P2/P3).",
+      "refs": [
+        "T1_ACTIVE_TURN_PROGRESS_DELTA_REAUDIT.md:590",
+        "T1_ACTIVE_TURN_PROGRESS_DELTA_REMEDIATION_REAUDIT.md:648",
+        "T1_ACTIVE_TURN_PROGRESS_DELTA_REMEDIATION_2_REAUDIT.md:186"
+      ],
+      "tests": [
+        "tests/test_completion_boundary.py::test_completed_task_semantic_drift_is_a_global_integrity_issue",
+        "tests/test_completion_boundary.py::test_active_task_status_anchor_drift_is_a_global_integrity_issue",
+        "tests/test_fresh_turn.py::test_preexisting_status_anchor_drift_fails_preflight_without_codex_launch"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: cross-check every task record against its ledger anchors each turn."
+    },
+    {
+      "id": "THR-38",
+      "name": "No-op turn counted as progress",
+      "statement": "A turn that exits 0 without any durable change, if reported as ordinary 'active', lets a loop spin forever.",
+      "mechanism": "A before/after durable snapshot (source digest, criteria, status, verification frontier) yields typed no_durable_progress; the supervisor stops after 2 consecutive no-progress turns.",
+      "threat": "A no-op fake codex was reported active (exit 10) indefinitely.",
+      "refs": [
+        "T1_ACTIVE_TURN_PROGRESS_DELTA_REAUDIT.md:205",
+        "T1_STATELESS_FRESH_TURN_REAUDIT.md:268",
+        "T1_CONSERVATIVE_TURN_SUPERVISOR_REAUDIT.md:438"
+      ],
+      "tests": [
+        "tests/test_fresh_turn.py::test_no_delta_turn_is_exact_ephemeral_and_restartable",
+        "tests/test_fresh_turn.py::test_non_content_residue_is_no_durable_progress",
+        "tests/test_conservative_turn_supervisor.py::test_two_consecutive_no_progress_turns_stop_without_third"
+      ],
+      "coupling": "host-neutral",
+      "loc": 19,
+      "g1_hint": "keep: progress is a harness-measured durable delta, never the agent saying it progressed."
+    },
+    {
+      "id": "THR-39",
+      "name": "Loops that never converge",
+      "statement": "Execution loops oscillate between equivalent states (A to B to A, verify-only history churn) or run unbounded unless state is fingerprinted and turns/episodes are hard-capped.",
+      "mechanism": "Semantic fingerprint (task, contract, status, criteria, verification state, source digest; excluding seq/timestamps) with a seen-set, MAX_ACTIVE_TURNS=8 and a 32-episode budget, terminal outcomes taking precedence.",
+      "threat": "A-B-A cycles and verify-only appends that never finish the task.",
+      "refs": [
+        "T1_CONSERVATIVE_TURN_SUPERVISOR_REAUDIT.md:459",
+        "T1_CONSERVATIVE_TURN_SUPERVISOR_REAUDIT.md:492",
+        "T1_MASTER_GOAL.md:109"
+      ],
+      "tests": [
+        "tests/test_conservative_turn_supervisor.py::test_effective_state_a_b_a_stops_as_oscillation",
+        "tests/test_conservative_turn_supervisor.py::test_monotonic_verification_history_is_not_in_fingerprint",
+        "tests/test_conservative_turn_supervisor.py::test_eight_unique_active_states_exhaust_budget_without_ninth",
+        "tests/test_multi_task_goal_loop.py::test_exact_32_episode_budget_has_no_thirty_third_launch"
+      ],
+      "coupling": "host-neutral",
+      "loc": 60,
+      "g1_hint": "keep: fingerprint semantic state, not history, and hard-cap turns."
+    },
+    {
+      "id": "THR-40",
+      "name": "Child process hangs without deadline",
+      "statement": "Without a wall-clock deadline per child invocation, one hung or partially-writing child blocks the controller forever; turn counts bound count, not duration.",
+      "mechanism": "Finite child deadline plus grace, then process-group termination and typed child_timeout; partial JSON never bypasses the deadline.",
+      "threat": "Sleeping selector/active children and a grandchild holding stdout hung the supervisor (P2).",
+      "refs": [
+        "T1_CONSERVATIVE_TURN_SUPERVISOR_REAUDIT.md:641",
+        "T1_CONSERVATIVE_TURN_SUPERVISOR_REMEDIATION_REAUDIT.md:189"
+      ],
+      "tests": [
+        "tests/test_conservative_turn_supervisor.py::test_child_deadline_bounds_sleep_partial_and_early_stdout_close",
+        "tests/test_conservative_turn_supervisor.py::test_partial_or_valid_json_never_bypasses_process_completion_deadline",
+        "tests/test_multi_task_goal_loop.py::test_supervisor_episode_deadline_is_finite_and_cleans_process"
+      ],
+      "coupling": "posix",
+      "loc": 0,
+      "g1_hint": "keep: every process G1 launches gets a hard deadline."
+    },
+    {
+      "id": "THR-41",
+      "name": "Unbounded child output capture",
+      "statement": "Capturing a child's whole stdout before size validation lets a flooding child exhaust controller memory.",
+      "mechanism": "Incremental bounded reads capped at the protocol limit (1024 bytes plus one), terminating the child on overflow with a typed protocol_error.",
+      "threat": "An infinite producer drove supervisor RSS to 3.2 GiB in 6 s (P2).",
+      "refs": [
+        "T1_CONSERVATIVE_TURN_SUPERVISOR_REAUDIT.md:656",
+        "T1_CONSERVATIVE_TURN_SUPERVISOR_REMEDIATION_REAUDIT.md:196"
+      ],
+      "tests": [
+        "tests/test_conservative_turn_supervisor.py::test_large_and_infinite_producers_stop_at_bounded_retained_buffer",
+        "tests/test_conservative_turn_supervisor.py::test_incremental_stdout_exact_size_boundaries",
+        "tests/test_multi_task_goal_loop.py::test_infinite_output_is_bounded_and_process_is_cleaned"
+      ],
+      "coupling": "posix",
+      "loc": 0,
+      "g1_hint": "keep: cap every captured stream G1 reads."
+    },
+    {
+      "id": "THR-42",
+      "name": "Descendants escape and keep mutating",
+      "statement": "Children and grandchildren outside a managed process group, or orphaned by a hard-killed parent, keep running and mutating state, and a restarted controller can overlap them.",
+      "mechanism": "Children run in a new process group killed TERM then KILL; the driver is a subreaper with PR_SET_PDEATHSIG and reconciles adopted descendants before the next episode; a supervisor script flock prevents overlapping episodes.",
+      "threat": "Supervisor SIGKILL left its adapter alive and a replacement started a second adapter (P2); setsid/double-fork descendants survive (P3/P4 residual).",
+      "refs": [
+        "T1_CONSERVATIVE_TURN_SUPERVISOR_REAUDIT.md:668",
+        "T1_CONSERVATIVE_TURN_SUPERVISOR_REMEDIATION_REAUDIT.md:610",
+        "T1_CONSERVATIVE_TURN_SUPERVISOR_REMEDIATION_REAUDIT.md:625",
+        "T1_MULTI_TASK_GOAL_LOOP_REAUDIT.md:207",
+        "CODEX_ROOT_HARNESS_REMEDIATION_REAUDIT.md:93"
+      ],
+      "tests": [
+        "tests/test_conservative_turn_supervisor.py::test_supervisor_timeout_mapping_cleans_direct_child_and_grandchild",
+        "tests/test_multi_task_goal_loop.py::test_prechange_supervisor_sigkill_allows_orphan_overlap",
+        "tests/test_multi_task_goal_loop.py::test_driver_sigkill_triggers_parent_death_cleanup_and_lock_restart",
+        "tests/test_multi_task_goal_loop.py::test_simultaneous_external_hard_kills_disclose_detached_limit"
+      ],
+      "coupling": "posix",
+      "loc": 0,
+      "g1_hint": "modify: prefer cgroups/PID namespaces where available; POSIX groups cannot catch setsid escapes."
+    },
+    {
+      "id": "THR-43",
+      "name": "Stale terminal outcome accepted",
+      "statement": "Accepting a child's terminal outcome (complete/blocked) without post-cleanup revalidation lets descendant writes after the decision make it stale.",
+      "mechanism": "Supervisor outcomes are only hints: the driver cleans up, requires two stable post-cleanup observations and re-runs the task/goal O8 gate with require_current before advancing.",
+      "threat": "A grandchild's write landed after the direct child emitted complete, and the supervisor emitted task_complete anyway (P3).",
+      "refs": [
+        "T1_CONSERVATIVE_TURN_SUPERVISOR_REMEDIATION_REAUDIT.md:583",
+        "T1_MULTI_TASK_GOAL_LOOP_REAUDIT.md:439",
+        "T1_MULTI_TASK_GOAL_LOOP_REAUDIT.md:464"
+      ],
+      "tests": [
+        "tests/test_multi_task_goal_loop.py::test_prechange_stale_terminal_descendant_mutation_is_reproduced",
+        "tests/test_multi_task_goal_loop.py::test_stale_terminal_hint_cannot_advance_or_repair_repository",
+        "tests/test_multi_task_goal_loop.py::test_raw_task_complete_hint_without_completion_is_rejected"
+      ],
+      "coupling": "posix",
+      "loc": 0,
+      "g1_hint": "keep: re-verify after all child processes are reaped, never at the moment of the claim."
+    },
+    {
+      "id": "THR-44",
+      "name": "Single-flight keyed to wrong identity",
+      "statement": "A mutual-exclusion lock keyed to a script inode instead of the protected resource lets copies bypass it and serializes unrelated repositories.",
+      "mechanism": "The driver adds a repository-scoped non-blocking directory guard; the supervisor's inode lock remains a disclosed P4.",
+      "threat": "A byte-identical copy at another inode ran concurrently in the same repo (P4).",
+      "refs": [
+        "T1_CONSERVATIVE_TURN_SUPERVISOR_REAUDIT.md:682",
+        "T1_CONSERVATIVE_TURN_SUPERVISOR_REMEDIATION_REAUDIT.md:618",
+        "T1_MULTI_TASK_GOAL_LOOP_REAUDIT.md:234"
+      ],
+      "tests": [
+        "tests/test_multi_task_goal_loop.py::test_repository_guard_is_directory_scoped_and_nonblocking",
+        "tests/test_multi_task_goal_loop.py::test_same_repository_blocks_same_copy_and_alias_driver_inodes"
+      ],
+      "coupling": "posix",
+      "loc": 0,
+      "g1_hint": "keep: key locks to the workspace identity."
+    },
+    {
+      "id": "THR-45",
+      "name": "Protocol validator fidelity errors",
+      "statement": "Inter-process protocol validators can be too strict (rejecting reachable legitimate outcomes) or too loose (accepting unpinned informational fields).",
+      "mechanism": "The validator accepts exactly the producer's reachable last-child outcomes and is tested against the real producer; informational-field permissiveness is documented P4.",
+      "threat": "turn_budget_exhausted after a final no_durable_progress turn was misreported as protocol_error (P2); resealed evidence with altered informational fields verified (P4).",
+      "refs": [
+        "T1_MULTI_TASK_GOAL_LOOP_REAUDIT.md:724",
+        "T1_MULTI_TASK_GOAL_LOOP_REMEDIATION_REAUDIT.md:600",
+        "T1_MULTI_TASK_GOAL_LOOP_NATIVE_E2E_REAUDIT.md:226"
+      ],
+      "tests": [
+        "tests/test_multi_task_goal_loop.py::test_turn_budget_accepts_both_reachable_last_child_outcomes",
+        "tests/test_multi_task_goal_loop.py::test_real_supervisor_mixed_final_turn_propagates_without_retry",
+        "tests/test_multi_task_goal_loop.py::test_supervisor_protocol_rejects_duplicate_keys_nan_and_exit_mismatch"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: derive the accepted alphabet from the producer's reachable states and test against the real producer."
+    },
+    {
+      "id": "THR-46",
+      "name": "Done versus next-task ambiguity",
+      "statement": "A stateless turn boundary cannot distinguish 'goal achieved' from 'next task not yet registered', so a loop stops after one task or needs a giant task or hidden memory.",
+      "mechanism": "Master Goal spec plus no-active selector plus multi-task driver: no_active triggers one selection turn and goal_complete is derived only from the final receipt.",
+      "threat": "The supervisor stopped after task A with no path to a second task.",
+      "refs": [
+        "T1_STATELESS_FRESH_TURN_REAUDIT.md:211",
+        "T1_STATELESS_FRESH_TURN_REAUDIT.md:238",
+        "T1_MULTI_TASK_GOAL_LOOP_REAUDIT.md:207"
+      ],
+      "tests": [
+        "tests/test_multi_task_goal_loop.py::test_prechange_supervisor_stops_after_task_a_without_next_selection",
+        "tests/test_multi_task_goal_loop.py::test_two_tasks_progress_only_through_fresh_supervisor_episodes"
+      ],
+      "coupling": "host-neutral",
+      "loc": 917,
+      "g1_hint": "modify: G1 needs an explicit terminal spec so 'no work' is never mistaken for 'done'."
+    },
+    {
+      "id": "THR-47",
+      "name": "Spec bloat with dead constructs",
+      "statement": "Normative specs accumulate dead symbols, removable formulas and duplicated statements that cost interpretation without adding rejection power.",
+      "mechanism": "Mutation/deletion attacks on the spec found removable blocks; the compressed spec is zero-symbol, formula-free and checker-pinned against re-growth.",
+      "threat": "Four dead symbols, two removable formula blocks and prose/formula duplication (P2); 9 axioms reducible to 5 (P3).",
+      "refs": [
+        "T1_MASTER_GOAL_SPEC_REAUDIT.md:821",
+        "T1_MASTER_GOAL_SPEC_REAUDIT.md:823",
+        "T1_MASTER_GOAL_SPEC_REAUDIT.md:826",
+        "T1_MASTER_GOAL_SPEC_REAUDIT.md:830"
+      ],
+      "tests": [
+        "tests/test_contract_assets.py::test_master_goal_final_form_is_formula_free_and_zero_symbol"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: keep G1's rule spec minimal and mutation-tested."
+    },
+    {
+      "id": "THR-48",
+      "name": "Checker overfit to current prose",
+      "statement": "A checker of hard-coded strings rejects meaning-preserving smaller rewrites, blocking legitimate simplification.",
+      "mechanism": "Data-driven checker with semantic regexes plus an equivalence corpus that must still pass (shorter authority, merged kernels, glyph variants).",
+      "threat": "About 115 hard-coded strings rejected glyph variants and paraphrases of required sentences (P2).",
+      "refs": [
+        "T1_MASTER_GOAL_SPEC_REAUDIT.md:828"
+      ],
+      "tests": [
+        "tests/test_contract_assets.py::test_master_goal_accepts_equivalent_smaller_forms"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: pair every negative corpus with a positive equivalence corpus."
+    },
+    {
+      "id": "THR-49",
+      "name": "Host-specific instruction leaks into repo",
+      "statement": "Host-specific standing instructions (a fixed /sdcard draft copy) in always-read instructions get applied wrongly and leak residue into the verified tree.",
+      "mechanism": "AGENTS.md bullet replaced with a host-neutral optional-copy rule and residue cleaned; the Goal checker forbids host paths, but AGENTS.md itself is only size-checked.",
+      "threat": "A relative-path copy created sdcard/abc/t1/draft/... inside the repo, which entered source_digest and the verified tree (P3/P4).",
+      "refs": [
+        "T1_MASTER_GOAL_SPEC_REAUDIT.md:832",
+        "T1_CORE_ISOLATION_REAUDIT.md:373",
+        "T1_HOST_NEUTRAL_AGENTS_REMEDIATION_REPORT.md:31",
+        "AGENTS.md:7"
+      ],
+      "tests": [],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: lint G1's injected instructions for host paths, not just the spec."
+    },
+    {
+      "id": "THR-50",
+      "name": "Scope creep into unneeded subsystems",
+      "statement": "Agents add subsystems without proven need (tool classifier, routing/delegation, resume loops, migration, private oracle, context rollover), expanding attack surface and leaking authority.",
+      "mechanism": "Audits issue DELETE/NOT_NEEDED verdicts backed by usage counts; deletion tasks removed them with negative tests asserting absence.",
+      "threat": "Route/delegate was always imported and the sole writer of invalidation events; rollover was proposed without an observed need.",
+      "refs": [
+        "T1_CONTROL_PLANE_MINIMALITY_AUDIT.md:77",
+        "T1_CONTROL_PLANE_REDUCTION_REAUDIT.md:38",
+        "T1_CONTROL_PLANE_REDUCTION_REAUDIT.md:319",
+        "T1_COMPLETION_BOUNDARY_HARDENING_REAUDIT.md:41"
+      ],
+      "tests": [
+        "tests/test_core_isolation.py::test_removed_subsystem_files_commands_skills_and_schema_are_absent",
+        "tests/test_optional_core_trim.py::test_deleted_resume_migration_and_oracle_surfaces_are_absent",
+        "tests/test_core_isolation.py::test_no_context_rollover_or_native_tool_interception_was_added"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: require a reproduced need before G1 grows a component."
+    },
+    {
+      "id": "THR-51",
+      "name": "Derived artifacts mistaken for authority",
+      "statement": "Caches, backups and reports that look canonical can be consumed as authority or go stale silently.",
+      "mechanism": "cache/report.json was deleted (no reader); report is derived on demand and writes nothing; the v1 backup is never restored as canonical.",
+      "threat": "A write-only cache with zero readers and a backup that could be mistaken for truth.",
+      "refs": [
+        "T1_CONTROL_PLANE_MINIMALITY_AUDIT.md:210",
+        "CODEX_ROOT_HARNESS_LEDGER_V2_REAUDIT.md:396"
+      ],
+      "tests": [
+        "tests/test_completion_boundary.py::test_report_is_read_only_and_ignores_inert_old_report_artifact"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: G1 recomputes views; it never trusts a cached verdict."
+    },
+    {
+      "id": "THR-52",
+      "name": "Fake or redirected provider passes as real",
+      "statement": "Environment overrides (base URL, fake-boundary flags, PATH shadowing) can swap the real agent/provider for a mock while evidence still looks like a real run.",
+      "mechanism": "Native E2E rejects fake/redirect env names, builds an allowlisted env, pins config without provider overrides, verifies executable path and sha256 per process, and grades transport STRONGLY_SUPPORTED, not PROVEN.",
+      "threat": "Mock transport or a shadowed codex binary producing E2E evidence.",
+      "refs": [
+        "T1_MULTI_TASK_GOAL_LOOP_NATIVE_E2E_REAUDIT.md:54",
+        "T1_MULTI_TASK_GOAL_LOOP_NATIVE_E2E_REAUDIT.md:55",
+        "T1_MULTI_TASK_GOAL_LOOP_NATIVE_E2E_REAUDIT.md:56"
+      ],
+      "tests": [
+        "tests/test_multi_task_goal_loop_native_e2e.py::test_native_mode_rejects_fake_or_redirected_environment",
+        "tests/test_multi_task_goal_loop_native_e2e.py::test_minimal_config_pins_approved_model_without_provider_override",
+        "tests/test_multi_task_goal_loop_native_e2e.py::test_native_executable_process_mismatch_is_rejected"
+      ],
+      "coupling": "codex",
+      "loc": 0,
+      "g1_hint": "keep: record binary hash and effective env for every agent process G1 observes."
+    },
+    {
+      "id": "THR-53",
+      "name": "Frozen evidence tampered and resealed",
+      "statement": "Self-describing evidence documents can be edited and resealed unless a canonical self-hash, an external receipt and a broad tamper matrix pin every gated field.",
+      "mechanism": "Canonical self-hash, root-receipt sealing of the artifact hash, strict JSON (duplicates/NaN rejected), secret-shape rejection and a 69-mutation tamper matrix.",
+      "threat": "Resealed variants changing informational fields or adding a fake process record still verified (P4).",
+      "refs": [
+        "T1_MULTI_TASK_GOAL_LOOP_NATIVE_E2E_REAUDIT.md:164",
+        "T1_MULTI_TASK_GOAL_LOOP_NATIVE_E2E_REAUDIT.md:226"
+      ],
+      "tests": [
+        "tests/test_multi_task_goal_loop_native_e2e.py::test_self_hash_tamper_is_rejected",
+        "tests/test_multi_task_goal_loop_native_e2e.py::test_duplicate_json_key_is_rejected",
+        "tests/test_multi_task_goal_loop_native_e2e.py::test_failure_evidence_cannot_verify_as_success"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: seal G1 evidence with an external anchor; a self-hash alone is resealable."
+    },
+    {
+      "id": "THR-54",
+      "name": "Hidden context smuggled as continuity",
+      "statement": "Continuity that silently relies on hidden conversation, memory or session state passes ordinary tests yet violates reconstruction-only continuity.",
+      "mechanism": "The E2E plants a durable marker (must be recovered) and an ephemeral nonce (must be unrecoverable from authority) across real /clear boundaries; continuity env IDs are excluded.",
+      "threat": "An agent recovering a value only present in prior conversation context.",
+      "refs": [
+        "T1_LOGICAL_SESSION_E2E_RETRY_REAUDIT.md:221",
+        "T1_LOGICAL_SESSION_E2E_RETRY_REAUDIT.md:233"
+      ],
+      "tests": [
+        "tests/test_multi_task_goal_loop_native_e2e.py::test_native_environment_excludes_continuity_ids"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "experiment: adopt the marker/nonce test to prove G1 continuity is reconstruction-only."
+    },
+    {
+      "id": "THR-55",
+      "name": "Model prose drives control decisions",
+      "statement": "Controllers that parse model text or unstable output to decide outcomes can be steered by the model.",
+      "mechanism": "Adapters emit one bounded typed JSON line and exit code; stderr is forwarded but never parsed; supervisor/driver contain no model invocation and reject cross-role outcomes.",
+      "threat": "A model printing 'goal complete' or crafted text to steer the loop.",
+      "refs": [
+        "T1_CONSERVATIVE_TURN_SUPERVISOR_REAUDIT.md:414",
+        "T1_STATELESS_FRESH_TURN_REAUDIT.md:327"
+      ],
+      "tests": [
+        "tests/test_conservative_turn_supervisor.py::test_stderr_is_forwarded_but_never_parsed",
+        "tests/test_multi_task_goal_loop.py::test_supervisor_stderr_is_inherited_and_never_parsed",
+        "tests/test_conservative_turn_supervisor.py::test_child_identity_mismatches_fail_closed"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: G1 branches only on harness-observed facts, never on LLM text."
+    },
+    {
+      "id": "THR-56",
+      "name": "Implementer reports overclaim or understate",
+      "statement": "Implementation reports overstate results (fixed in production, no new P1, tests pass, check counts) or understate severity and omit residual attack paths.",
+      "mechanism": "Each claim gets a claim-to-evidence matrix row reproduced by an independent auditor; discrepancies are logged as findings.",
+      "threat": "'Production failure fixed' and 'no new P0/P1' were false; F11 severity understated; tail truncation omitted from residuals; smoke checks miscounted.",
+      "refs": [
+        "T1_CONTROL_PLANE_MINIMALITY_AUDIT.md:57",
+        "T1_CONTROL_PLANE_MINIMALITY_AUDIT.md:58",
+        "CODEX_ROOT_HARNESS_REMEDIATION_REAUDIT.md:30",
+        "CODEX_ROOT_HARNESS_REMEDIATION_REAUDIT.md:183",
+        "T1_CORE_ISOLATION_REAUDIT.md:374"
+      ],
+      "tests": [],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: treat every agent report as a list of claims to re-execute."
+    },
+    {
+      "id": "THR-57",
+      "name": "Premature completion claims",
+      "statement": "Agents claim completion before verification exists or present historical completion as current verification.",
+      "mechanism": "Reports are frozen before Public Verify and bound as artifacts; completion requires a later receipt-bound transition; auditors check report < started < succeeded < complete ordering.",
+      "threat": "A report asserts done while no verification_succeeded receipt exists.",
+      "refs": [
+        "AGENTS.md:5",
+        "T1_COMPLETION_BOUNDARY_REMEDIATION_2_REAUDIT.md:37",
+        "T1_LOGICAL_SESSION_E2E_RETRY_REAUDIT.md:14",
+        ".agents/skills/report/SKILL.md:27"
+      ],
+      "tests": [
+        "tests/test_cli.py::test_verify_report_and_completion_gate"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: a 'done' message without a G1-observed receipt is logged as a false claim."
+    },
+    {
+      "id": "THR-58",
+      "name": "Remediations introduce regressions",
+      "statement": "A fix for one finding can create new failure modes (stuck states, weakened legacy checks) unless the whole boundary is re-audited, including crash windows.",
+      "mechanism": "Every remediation gets a full independent re-audit with crash and concurrency matrices before readiness advances.",
+      "threat": "The G1 race fix created the H1 permanent stuck state; core isolation dropped manifest checks a prior audit relied on.",
+      "refs": [
+        "T1_COMPLETION_BOUNDARY_REMEDIATION_REAUDIT.md:37",
+        "T1_CORE_ISOLATION_REAUDIT.md:367"
+      ],
+      "tests": [
+        "tests/test_completion_boundary_remediation_2.py::test_h1_nine_process_kill_points_converge_exactly_once"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: re-run the full adversarial matrix after every fix."
+    },
+    {
+      "id": "THR-59",
+      "name": "Self-approval and non-independent audit",
+      "statement": "An implementer approving its own work, or an audit drawing on auxiliary models/subagents, cannot count as verification.",
+      "mechanism": "Auditors are non-implementers in fresh sessions with recorded process compliance (substantive auditor, zero subagents/auxiliary models); O12 rejects self-approval.",
+      "threat": "An implementer signing off its own claims.",
+      "refs": [
+        "T1_MASTER_GOAL.md:56",
+        "CODEX_ROOT_HARNESS_POST_IMPLEMENTATION_AUDIT.md:3",
+        "T1_MULTI_TASK_GOAL_LOOP_NATIVE_E2E_REAUDIT.md:220"
+      ],
+      "tests": [
+        "tests/test_contract_assets.py::test_master_goal_rejects_semantic_contradictions"
+      ],
+      "coupling": "host-neutral",
+      "loc": 0,
+      "g1_hint": "keep: the agent under test never grades itself."
+    }
+  ],
+  "findings": [
+    {
+      "kind": "open-risk",
+      "detail": "Same-OS-user threat boundary: T1 assumes a single cooperative root writer; a same-user process can coherently rewrite plan, ledger, head and evidence (the head anchor sits beside the ledger and is same-user writable), which T1 scopes out but a paranoid G1 must not.",
+      "refs": [
+        "CODEX_ROOT_HARNESS_REMEDIATION_REAUDIT.md:84",
+        "T1_COMPLETION_BOUNDARY_REMEDIATION_REAUDIT.md:298",
+        "T1_LEDGER_CANONICALITY_REAUDIT.md:514",
+        "T1_SELECTION_OPERATION_BINDING_REAUDIT.md:695"
+      ]
+    },
+    {
+      "kind": "open-risk",
+      "detail": "N9 never remediated: the canonical flock blocks with no timeout, so a stopped holder hangs every surface (N8-N13 were explicitly not claimed fixed).",
+      "refs": [
+        "CODEX_ROOT_HARNESS_LEDGER_V2_REAUDIT.md:358",
+        "src/codex_harness/ledger.py:1460",
+        "CODEX_ROOT_HARNESS_CONTROL_PLANE_REMEDIATION_REPORT.md:174"
+      ]
+    },
+    {
+      "kind": "open-risk",
+      "detail": "N10 never remediated: lock identity is checked only at open time; there is no post-acquire inode recheck, so a replaced lock file can break mutual exclusion.",
+      "refs": [
+        "CODEX_ROOT_HARNESS_LEDGER_V2_REAUDIT.md:363",
+        "src/codex_harness/ledger.py:1420"
+      ]
+    },
+    {
+      "kind": "open-risk",
+      "detail": "Detached (setsid/double-fork) descendants and simultaneous external hard kills escape POSIX process-group cleanup; a cgroup/service boundary is required before 24x7 use.",
+      "refs": [
+        "CODEX_ROOT_HARNESS_REMEDIATION_REAUDIT.md:93",
+        "T1_CONSERVATIVE_TURN_SUPERVISOR_REMEDIATION_REAUDIT.md:625",
+        "T1_MULTI_TASK_GOAL_LOOP_REAUDIT.md:421"
+      ]
+    },
+    {
+      "kind": "open-risk",
+      "detail": "Host hook trust hashes only the handler/wrapper definition, not transitively imported harness code; deferred as host-owned.",
+      "refs": [
+        "T1_STOP_HOOK_REDUCTION_REAUDIT.md:349",
+        "T1_SESSIONSTART_ACTIVE_ONLY_REDUCTION_REAUDIT.md:219"
+      ]
+    },
+    {
+      "kind": "open-risk",
+      "detail": "Prose checkers are bounded oracles with no remediation planned: gutted-but-consistent obligations, wrong-property evidence containing a deterministic token, and paraphrased giant tasks pass.",
+      "refs": [
+        "T1_MASTER_GOAL_SPEC_COMPRESSION_REAUDIT.md:615",
+        "T1_NO_ACTIVE_SELECTION_BOUNDARY_REAUDIT.md:724"
+      ]
+    },
+    {
+      "kind": "open-risk",
+      "detail": "Goal-terminal coverage is declaration-checked: goal_complete trusts the final task's own Public Verify for all ten properties.",
+      "refs": [
+        "T1_NO_ACTIVE_SELECTION_BOUNDARY_REAUDIT.md:755"
+      ]
+    },
+    {
+      "kind": "open-risk",
+      "detail": "Selection operation nonce is correlation, not authentication (forced collision or same-user argv forgery is attributable), and it is stored as an acceptance criterion for lack of a metadata channel.",
+      "refs": [
+        "T1_SELECTION_OPERATION_BINDING_REAUDIT.md:679",
+        "T1_SELECTION_OPERATION_BINDING_REAUDIT.md:695"
+      ]
+    },
+    {
+      "kind": "open-risk",
+      "detail": "Real provider transport and remote model identity are not attested (STRONGLY_SUPPORTED / CONFIGURED_ONLY); evidence is anchored in config, binary hashes and root receipts only.",
+      "refs": [
+        "T1_MULTI_TASK_GOAL_LOOP_NATIVE_E2E_REAUDIT.md:56",
+        "T1_MULTI_TASK_GOAL_LOOP_NATIVE_E2E_REAUDIT.md:57",
+        "T1_MULTI_TASK_GOAL_LOOP_NATIVE_E2E_REAUDIT.md:231"
+      ]
+    },
+    {
+      "kind": "open-risk",
+      "detail": "Explicit invalidation is accepted on completed (terminal) tasks; whether that override is intended was never decided and remains deferred.",
+      "refs": [
+        "T1_LOGICAL_SESSION_E2E_RETRY_REAUDIT.md:405",
+        "T1_LEDGER_CANONICALITY_REAUDIT.md:519",
+        "T1_SESSIONSTART_ACTIVE_ONLY_REDUCTION_REAUDIT.md:317"
+      ]
+    },
+    {
+      "kind": "open-risk",
+      "detail": "git_tree_hash snapshots write loose objects into .git/objects on every verification/completion with no bound or gc policy.",
+      "refs": [
+        "T1_LOGICAL_SESSION_E2E_RETRY_REAUDIT.md:410",
+        "T1_CORE_ISOLATION_REAUDIT.md:369",
+        "src/codex_harness/util.py:545"
+      ]
+    },
+    {
+      "kind": "open-risk",
+      "detail": "Informational fields of the supervisor payload and frozen E2E evidence are not pinned (resealed variants accepted); documented as P4, not fixed.",
+      "refs": [
+        "T1_MULTI_TASK_GOAL_LOOP_REMEDIATION_REAUDIT.md:600",
+        "T1_MULTI_TASK_GOAL_LOOP_NATIVE_E2E_REAUDIT.md:226"
+      ]
+    },
+    {
+      "kind": "limitation",
+      "detail": "Canonical file modes (plan 0644/0666, ledger/head 0644) are not enforced on the read path; only write paths restore 0600.",
+      "refs": [
+        "T1_CONTROL_PLANE_REDUCTION_REAUDIT.md:288",
+        "T1_ACTIVE_TURN_PROGRESS_DELTA_REAUDIT.md:624",
+        "T1_LEDGER_CANONICALITY_REAUDIT.md:517"
+      ]
+    },
+    {
+      "kind": "limitation",
+      "detail": "O(1) ordinary append validates only the tail record, so middle-of-ledger corruption is caught only by full verify or full-read events.",
+      "refs": [
+        "T1_LEDGER_CANONICALITY_REAUDIT.md:49",
+        "T1_LEDGER_CANONICALITY_REAUDIT.md:529"
+      ]
+    },
+    {
+      "kind": "limitation",
+      "detail": "report --require-complete is vacuously true for a zero-task plan; Goal authority is separate, but any consumer gating on report.complete gets a vacuous pass.",
+      "refs": [
+        "T1_LEDGER_CANONICALITY_REAUDIT.md:518",
+        "T1_MULTI_TASK_GOAL_LOOP_NATIVE_E2E_REAUDIT.md:130"
+      ]
+    },
+    {
+      "kind": "limitation",
+      "detail": "Native in-turn compaction is possible and unbounded inside a single agent turn; only small atomic tasks mitigate it.",
+      "refs": [
+        "T1_STATELESS_FRESH_TURN_REAUDIT.md:199",
+        "T1_STATELESS_FRESH_TURN_REAUDIT.md:415"
+      ]
+    },
+    {
+      "kind": "limitation",
+      "detail": "Evidence uses one fixed path per task (manifest.json, command.stdout, command.stderr), so a failed attempt's raw output is overwritten by the next attempt; only ledger digests survive (M10).",
+      "refs": [
+        "T1_CONTROL_PLANE_MINIMALITY_AUDIT.md:73",
+        "src/codex_harness/evidence.py:173"
+      ]
+    },
+    {
+      "kind": "limitation",
+      "detail": "AGENTS.md and skill rules (no completion claim without evidence, read policy, host neutrality) are advisory text; the checker validates only AGENTS.md size, and model chat claims are unconstrained except by the CLI completion gate.",
+      "refs": [
+        "scripts/check_contracts.py:80",
+        "AGENTS.md:5",
+        "T1_MASTER_GOAL_SPEC_REAUDIT.md:832"
+      ]
+    },
+    {
+      "kind": "limitation",
+      "detail": "Frozen-anchor tripwires (exact digests in tests) live in the same agent-writable tree as the code they pin, so a single change can update both; they detect accidents, not a coordinated agent.",
+      "refs": [
+        "tests/test_contract_assets.py:65",
+        "T1_ACTIVE_TURN_PROGRESS_DELTA_REMEDIATION_2_REAUDIT.md:572"
+      ]
+    },
+    {
+      "kind": "limitation",
+      "detail": "Canonical runtime state is git-ignored, so a git-only clone is lost state; cross-host moves must carry .harness, and a historical test still reads the live .harness.",
+      "refs": [
+        "T1_LEDGER_CANONICALITY_REMEDIATION_REAUDIT.md:313",
+        ".gitignore:1"
+      ]
+    },
+    {
+      "kind": "inconsistency",
+      "detail": "docs/AUDIT.md is a stale baseline (Codex CLI 0.150.1, pre-reduction surfaces) while later audits run 0.151.0 with a SessionStart-only manifest.",
+      "refs": [
+        "docs/AUDIT.md:13",
+        "T1_STATELESS_FRESH_TURN_REAUDIT.md:16"
+      ]
+    },
+    {
+      "kind": "limitation",
+      "detail": "Atom loc values are approximate: audit-stated deltas where available, whole-module size where the mechanism is a module, and 0 for principles or deleted mechanisms.",
+      "refs": []
+    }
+  ]
+}

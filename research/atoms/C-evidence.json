@@ -1,0 +1,895 @@
+{
+  "scope": "evidence",
+  "atoms": [
+    {
+      "id": "EVI-01",
+      "name": "Harness-executed verification is sole evidence",
+      "statement": "Success evidence MUST come only from a verification command the harness itself spawned, observed and recorded; agent self-report or predicted success never counts.",
+      "mechanism": "verify_task runs the plan's Public Verify via _run_shell, captures the real return code and output, writes a manifest and appends ledger receipts; the verify skill forbids converting self-report into evidence.",
+      "threat": "Agent claims tests pass without running them, or reports a fabricated exit status.",
+      "refs": ["src/codex_harness/evidence.py:228", "src/codex_harness/evidence.py:277", ".agents/skills/verify/SKILL.md:20"],
+      "tests": ["tests/test_evidence.py::test_passing_verification_records_required_manifest_fields", "tests/test_security_core.py::test_verification_failed_only_never_completes"],
+      "coupling": "host-neutral",
+      "loc": 155,
+      "g1_hint": "keep: this is G1's core premise; run verifiers from the omp extension process, never through an agent tool call."
+    },
+    {
+      "id": "EVI-02",
+      "name": "Verification runs only in root workspace",
+      "statement": "Authoritative verification MUST execute with cwd equal to the resolved repository root, and evidence MUST record workspace '.'.",
+      "mechanism": "_root_workspace raises unsafe_workspace unless workspace.resolve() == root.resolve(); checked before the started receipt and again in record_manifest; validate_manifest rejects workspace != '.'.",
+      "threat": "Verifying a scratch worktree or subdirectory and presenting it as root-repository evidence.",
+      "refs": ["src/codex_harness/evidence.py:85", "src/codex_harness/evidence.py:171", "src/codex_harness/evidence.py:251", "src/codex_harness/evidence.py:500", "src/codex_harness/cli.py:463"],
+      "tests": [],
+      "coupling": "host-neutral",
+      "loc": 15,
+      "g1_hint": "keep: pin cwd to the session root the extension owns; drop the vestigial --workspace option."
+    },
+    {
+      "id": "EVI-03",
+      "name": "Absolute-path bash runner with captured output",
+      "statement": "The verifier MUST be launched through a fixed absolute interpreter path with controlled cwd and environment, capturing stdout and stderr in full.",
+      "mechanism": "_run_shell calls subprocess.run(command, shell=True, executable='/bin/bash', cwd=workspace, env=scrubbed, text=True, capture_output=True, timeout, check=False).",
+      "threat": "PATH-shadowed shell or inherited cwd/env altering what actually runs.",
+      "refs": ["src/codex_harness/evidence.py:122", "src/codex_harness/evidence.py:130"],
+      "tests": ["tests/test_evidence.py::test_nonzero_command_records_failure_not_completion"],
+      "coupling": "posix",
+      "loc": 20,
+      "g1_hint": "modify: keep the absolute interpreter, but capture bytes (text=True crashes on non-UTF-8 output) and spawn in a new process group."
+    },
+    {
+      "id": "EVI-04",
+      "name": "Timeout yields exit 124 and flag",
+      "statement": "A verifier exceeding its time budget MUST be killed and recorded as timed_out with exit 124, never as a pass.",
+      "mechanism": "TimeoutExpired is caught, partial bytes decoded, a timeout line appended to stderr and (124, out, err, True) returned; default 900 s via CLI --timeout; validate_manifest requires timed_out is False.",
+      "threat": "Hung or deliberately stalled verifier, or a partial run treated as success.",
+      "refs": ["src/codex_harness/evidence.py:142", "src/codex_harness/evidence.py:235", "src/codex_harness/evidence.py:496", "src/codex_harness/cli.py:562"],
+      "tests": [],
+      "coupling": "posix",
+      "loc": 16,
+      "g1_hint": "modify: keep semantics but kill the whole process group/cgroup and make the budget harness-configured, not agent-supplied."
+    },
+    {
+      "id": "EVI-05",
+      "name": "Pass means exit zero, not timed out",
+      "statement": "A run passes only if the observed exit code is exactly 0 and it did not time out; harness-internal failures map to exit 70, and the result is passed only when a success receipt was appended.",
+      "mechanism": "passed = exit_code == 0, then gated by the snapshot re-check; the HarnessError path sets exit_code or 70; VerificationResult.passed = success_receipt is not None; validate_manifest rejects exit_code != 0 or timed_out.",
+      "threat": "Partial success, misread exit codes, or a pass without a durable receipt.",
+      "refs": ["src/codex_harness/evidence.py:298", "src/codex_harness/evidence.py:340", "src/codex_harness/evidence.py:374", "src/codex_harness/evidence.py:492"],
+      "tests": ["tests/test_evidence.py::test_nonzero_command_records_failure_not_completion", "tests/test_security_core.py::test_manifest_exit_code_one_to_zero_forgery_cannot_complete"],
+      "coupling": "host-neutral",
+      "loc": 12,
+      "g1_hint": "keep: a binary exit-0 predicate is simple and observer-checkable."
+    },
+    {
+      "id": "EVI-06",
+      "name": "Completed tasks refuse re-verification",
+      "statement": "Verification MUST be refused for a task whose plan status is complete or whose ledger holds a complete transition, so historical evidence is never overwritten.",
+      "mechanism": "verify_task raises verification_refused_complete_task on plan status; Ledger._validate_verification_start re-checks the ledger before appending verification_started.",
+      "threat": "Overwriting or re-binding evidence of an already-completed task.",
+      "refs": ["src/codex_harness/evidence.py:237", "src/codex_harness/ledger.py:1975", "src/codex_harness/ledger.py:2088"],
+      "tests": ["tests/test_completion_boundary.py::test_completed_task_verify_is_typed_no_write_and_active_verify_still_works"],
+      "coupling": "host-neutral",
+      "loc": 23,
+      "g1_hint": "keep: terminal tasks immutable; the ledger-side check is the real guard since plan status is agent-editable."
+    },
+    {
+      "id": "EVI-07",
+      "name": "Contract registered before verification",
+      "statement": "Verification MUST run against a ledger-registered contract hash; an unaccepted contract change aborts before any receipt.",
+      "mechanism": "verify_task calls ensure_contract, which registers a new contract or raises contract_drift when the plan's contract hash differs from the last registered one.",
+      "threat": "Silently verifying an edited contract (weaker command or artifacts).",
+      "refs": ["src/codex_harness/evidence.py:242", "src/codex_harness/plan.py:282", "src/codex_harness/plan.py:340"],
+      "tests": ["tests/test_plan.py::test_contract_drift_requires_explicit_acceptance", "tests/test_security_core.py::test_previous_contract_receipt_is_stale"],
+      "coupling": "host-neutral",
+      "loc": 76,
+      "g1_hint": "modify: in G1 the contract (command, artifacts) should be fixed by the user or harness, not accepted by the agent."
+    },
+    {
+      "id": "EVI-08",
+      "name": "Command identity bound by SHA-256 digest",
+      "statement": "Every receipt and manifest MUST carry the SHA-256 of the exact executed command, and completion MUST require it to equal the digest of the plan's Public Verify.",
+      "mechanism": "public_command_digest hashes the raw UTF-8 command; it is stored in started/succeeded/failed receipts and the manifest; validate_manifest raises verification_command_drift and completion PUBLIC_COMMAND_MISMATCH on difference.",
+      "threat": "Running an easier command and passing it off as the planned verifier.",
+      "refs": ["src/codex_harness/evidence.py:81", "src/codex_harness/evidence.py:250", "src/codex_harness/evidence.py:537", "src/codex_harness/completion.py:364"],
+      "tests": [],
+      "coupling": "host-neutral",
+      "loc": 20,
+      "g1_hint": "keep, but refuse the --command override at run time instead of recording a success for a non-plan command."
+    },
+    {
+      "id": "EVI-09",
+      "name": "Allowlist-only child environment",
+      "statement": "The verifier MUST receive a freshly built allowlist environment, never the parent environment.",
+      "mechanism": "scrubbed_environment returns only PATH, HOME, TMPDIR, XDG_CONFIG/CACHE/DATA_HOME, GIT_CONFIG_GLOBAL=/dev/null, GIT_CONFIG_NOSYSTEM=1, PYTHONDONTWRITEBYTECODE=1, NO_COLOR=1, plus LANG/LC_ALL/LC_CTYPE/TZ/TERM passthrough.",
+      "threat": "Credential leakage into verifier output and env injection (LD_PRELOAD, BASH_ENV, PYTHONPATH, GIT_DIR).",
+      "refs": ["src/codex_harness/util.py:650", "src/codex_harness/util.py:676", "src/codex_harness/util.py:688"],
+      "tests": ["tests/test_security_core.py::test_parent_secrets_never_enter_public_evidence"],
+      "coupling": "posix",
+      "loc": 20,
+      "g1_hint": "keep: allowlist beats denylist; build it in the extension, not from omp's own environment."
+    },
+    {
+      "id": "EVI-10",
+      "name": "Private per-attempt HOME and TMPDIR",
+      "statement": "Each verification attempt MUST get its own owner-only HOME and TMPDIR shared with no other attempt or the user's real home.",
+      "mechanism": "verify_task creates .harness/private/runtime (0700) and mkdtemp verify-<attempt>-*; scrubbed_environment creates home/ and tmp/ (0700) inside it, but secures the runtime dir with no boundary, chmodding every ancestor to 0700.",
+      "threat": "Verifier reading real dotfiles or credential caches via HOME; cross-attempt temp contamination.",
+      "refs": ["src/codex_harness/evidence.py:114", "src/codex_harness/evidence.py:272", "src/codex_harness/util.py:655"],
+      "tests": ["tests/test_security_core.py::test_parent_secrets_never_enter_public_evidence"],
+      "coupling": "proot",
+      "loc": 17,
+      "g1_hint": "modify: keep per-attempt sandbox dirs outside the workspace and fix the boundary-less ancestor chmod, which only works where the user owns every ancestor (e.g. proot)."
+    },
+    {
+      "id": "EVI-11",
+      "name": "PATH entries inside repository denied",
+      "statement": "PATH entries resolving inside the repository MUST be removed from the verifier's PATH.",
+      "mechanism": "scrubbed_environment drops non-empty PATH entries whose resolve() is relative_to(denied_root=root); empty entries are skipped.",
+      "threat": "Repo-planted binaries (fake pytest/python) shadowing system tools to fake a pass.",
+      "refs": ["src/codex_harness/util.py:662"],
+      "tests": [],
+      "coupling": "posix",
+      "loc": 14,
+      "g1_hint": "modify: resolve relative entries against the child cwd, apply the same filter to harness git calls, prefer absolute tool paths."
+    },
+    {
+      "id": "EVI-12",
+      "name": "Runtime cleanup with surfaced warning",
+      "statement": "The per-attempt runtime directory MUST be removed after every run, and a cleanup failure MUST be surfaced rather than hidden.",
+      "mechanism": "finally: shutil.rmtree(runtime); an OSError becomes cleanup_warning in VerificationResult.as_dict and the CLI prints WARNING to stderr.",
+      "threat": "Leftover verifier state (tokens, caches) leaking into later attempts or evidence.",
+      "refs": ["src/codex_harness/evidence.py:359", "src/codex_harness/cli.py:476"],
+      "tests": ["tests/test_security_core.py::test_parent_secrets_never_enter_public_evidence"],
+      "coupling": "host-neutral",
+      "loc": 11,
+      "g1_hint": "keep."
+    },
+    {
+      "id": "EVI-13",
+      "name": "Secret env values harvested by name",
+      "statement": "Values of parent env vars whose names look secret (length >= 4) MUST be redacted wherever they appear in evidence.",
+      "mechanism": "secret_environment_values selects values whose key matches api_key|token|secret|password|credential|authorization|private_key (case-insensitive); redact_secrets replaces them longest-first with [REDACTED].",
+      "threat": "A verifier or command line echoing a real credential into persisted evidence.",
+      "refs": ["src/codex_harness/util.py:609", "src/codex_harness/util.py:624", "src/codex_harness/util.py:637", "src/codex_harness/evidence.py:246"],
+      "tests": ["tests/test_security_core.py::test_parent_secrets_never_enter_public_evidence"],
+      "coupling": "host-neutral",
+      "loc": 13,
+      "g1_hint": "keep; also redact encoded forms and short values, and never fall back to the full process env on an empty mapping."
+    },
+    {
+      "id": "EVI-14",
+      "name": "Pattern-based secret redaction",
+      "statement": "Known token shapes MUST be redacted from command text and outputs before persistence.",
+      "mechanism": "Regexes for sk-..., gh[pousr]_/github_pat_, AKIA..., 'Authorization: Bearer <tok>' and key/token/secret/password/credential [:=] value; replacement keeps the prefix and writes =[REDACTED].",
+      "threat": "Literal secrets printed by tools landing in evidence files.",
+      "refs": ["src/codex_harness/util.py:613", "src/codex_harness/util.py:635"],
+      "tests": ["tests/test_security_core.py::test_parent_secrets_never_enter_public_evidence"],
+      "coupling": "host-neutral",
+      "loc": 22,
+      "g1_hint": "modify: extend to JSON-quoted keys, PEM blocks, JWTs, xox*, AIza and Basic auth, all currently missed."
+    },
+    {
+      "id": "EVI-15",
+      "name": "Redact before any persistence",
+      "statement": "Unredacted command text and output MUST never be written to disk or returned; only redacted forms persist.",
+      "mechanism": "record_manifest redacts stdout/stderr before atomic_write_text and redacts the manifest command; verify_task returns redacted command/stdout/stderr; output digests cover the redacted bytes.",
+      "threat": "Secrets persisting in evidence files that are later shared or committed.",
+      "refs": ["src/codex_harness/evidence.py:175", "src/codex_harness/evidence.py:193", "src/codex_harness/evidence.py:247", "src/codex_harness/evidence.py:378"],
+      "tests": ["tests/test_security_core.py::test_parent_secrets_never_enter_public_evidence"],
+      "coupling": "host-neutral",
+      "loc": 8,
+      "g1_hint": "keep; note the output digests attest the redacted bytes, not raw output."
+    },
+    {
+      "id": "EVI-16",
+      "name": "Ledger stores digests and codes only",
+      "statement": "Append-only receipts MUST carry digests, paths and failure codes, never raw command text or output.",
+      "mechanism": "verification_started/succeeded/failed store public_command_digest, stdout/stderr sha256, manifest path and hash, and failure=error.code instead of command or output strings.",
+      "threat": "Secrets becoming permanent in an unredactable append-only log.",
+      "refs": ["src/codex_harness/evidence.py:252", "src/codex_harness/evidence.py:309", "src/codex_harness/evidence.py:326", "src/codex_harness/evidence.py:342"],
+      "tests": ["tests/test_security_core.py::test_parent_secrets_never_enter_public_evidence"],
+      "coupling": "host-neutral",
+      "loc": 10,
+      "g1_hint": "keep."
+    },
+    {
+      "id": "EVI-17",
+      "name": "Owner-only symlink-free harness directories",
+      "statement": "Evidence and private runtime directories MUST be created component-by-component below a boundary, rejecting symlinks and forcing mode 0700.",
+      "mechanism": "ensure_secure_directory lstats each component, mkdirs if missing, opens with O_NOFOLLOW|O_DIRECTORY, re-fstats and fchmods to the mode; used for .harness, evidence/<task> and private/runtime.",
+      "threat": "A symlinked .harness/evidence redirecting writes outside the repo; other local users reading evidence.",
+      "refs": ["src/codex_harness/util.py:182", "src/codex_harness/evidence.py:94", "src/codex_harness/evidence.py:114", "src/codex_harness/ledger.py:207"],
+      "tests": ["tests/test_security_core.py::test_ledger_and_lock_symlinks_are_rejected"],
+      "coupling": "posix",
+      "loc": 93,
+      "g1_hint": "modify: same-uid modes do not separate harness from agent; store evidence in an extension-owned dir outside the agent-writable tree."
+    },
+    {
+      "id": "EVI-18",
+      "name": "Private evidence file descriptor checks",
+      "statement": "Evidence files MUST be written atomically at 0600 and, when read, MUST be a regular, single-link, exact-0600 file checked on the open descriptor.",
+      "mechanism": "atomic_write_text(mode=0o600) for outputs and manifest; secure_file_digest opens with O_NOFOLLOW and fstat-checks S_ISREG, st_nlink == 1 and mode == 0600 before hashing.",
+      "threat": "Hardlink, symlink, FIFO or permissive-mode substitution of evidence files.",
+      "refs": ["src/codex_harness/util.py:61", "src/codex_harness/evidence.py:178", "src/codex_harness/evidence.py:211", "src/codex_harness/evidence.py:419"],
+      "tests": ["tests/test_core_isolation.py::test_new_command_output_file_security_is_enforced"],
+      "coupling": "posix",
+      "loc": 25,
+      "g1_hint": "keep."
+    },
+    {
+      "id": "EVI-19",
+      "name": "Atomic fsynced file replacement",
+      "statement": "Harness files MUST be replaced atomically with data and directory fsync so readers never see partial content.",
+      "mechanism": "atomic_write: mkstemp in the target dir, fchmod, write, flush, fsync, os.replace, fsync the parent dir, unlink the temp file on failure.",
+      "threat": "Torn or partially written manifests and outputs after a crash.",
+      "refs": ["src/codex_harness/util.py:155", "src/codex_harness/util.py:178"],
+      "tests": [],
+      "coupling": "posix",
+      "loc": 25,
+      "g1_hint": "keep."
+    },
+    {
+      "id": "EVI-20",
+      "name": "Single-slot task-local evidence path",
+      "statement": "A task's evidence lives at the fixed path .harness/evidence/<task_id>/ and a success receipt MUST reference exactly that manifest.",
+      "mechanism": "record_manifest writes command.stdout, command.stderr and manifest.json in evidence/<task_id>; completion requires receipt.manifest == '.harness/evidence/<task>/manifest.json'.",
+      "threat": "Reusing another task's manifest or receipt (cross-task replay).",
+      "refs": ["src/codex_harness/evidence.py:172", "src/codex_harness/evidence.py:209", "src/codex_harness/completion.py:286", "src/codex_harness/completion.py:377"],
+      "tests": ["tests/test_security_core.py::test_cross_task_success_receipt_cannot_reuse_manifest"],
+      "coupling": "host-neutral",
+      "loc": 8,
+      "g1_hint": "modify: use per-attempt content-addressed evidence so earlier attempts are never overwritten."
+    },
+    {
+      "id": "EVI-21",
+      "name": "Runtime evidence paths are git-ignored",
+      "statement": "Ledger, head, pending, lock, evidence/ and private/ paths MUST be git-ignored while the canonical plan MUST NOT be.",
+      "mechanism": ".gitignore lists the runtime paths; check_contracts.check_ignore_contract runs git check-ignore on sample paths and on .harness/plan.md.",
+      "threat": "Evidence or private runtime files being committed, or the plan accidentally untracked.",
+      "refs": [".gitignore:2", "scripts/check_contracts.py:173"],
+      "tests": ["tests/test_contract_assets.py::test_repository_control_contract_checker_passes"],
+      "coupling": "git",
+      "loc": 27,
+      "g1_hint": "modify: keep G1 evidence outside the repo entirely, which makes this contract unnecessary."
+    },
+    {
+      "id": "EVI-22",
+      "name": "Manifest schema v3 field set",
+      "statement": "A manifest MUST record schema_version 3, task id, contract hash, attempt id, redacted command, command digest, exit code, timestamp, git tree hash, source digest, workspace, timed_out, artifacts and output paths with digests.",
+      "mechanism": "record_manifest builds the dict and writes sorted pretty JSON; schemas/evidence-manifest.schema.json documents it (const 3, additionalProperties false).",
+      "threat": "Under-specified evidence that cannot be re-validated later.",
+      "refs": ["src/codex_harness/evidence.py:38", "src/codex_harness/evidence.py:188", "schemas/evidence-manifest.schema.json:7"],
+      "tests": ["tests/test_evidence.py::test_passing_verification_records_required_manifest_fields", "tests/test_contract_assets.py::test_schema_fixtures_are_valid_json_and_have_required_contract_fields"],
+      "coupling": "host-neutral",
+      "loc": 85,
+      "g1_hint": "modify: keep the field set, add a pre-run snapshot and runner identity, and validate against the schema at run time."
+    },
+    {
+      "id": "EVI-23",
+      "name": "Legacy v2 and oracle fields tolerated",
+      "statement": "Schema-2 manifests (no output digests) and inert legacy oracle fields are accepted but labelled as weaker evidence.",
+      "mechanism": "validate_manifest allows schema 2 or 3, permits oracle_executed/oracle_result/private_receipt_digest keys and for v2 requires only stdout/stderr paths; completion labels evidence_mode legacy-output-unbound or legacy-manifest-unbound.",
+      "threat": "principle (backward compatibility with older receipts)",
+      "refs": ["src/codex_harness/evidence.py:39", "src/codex_harness/evidence.py:473", "src/codex_harness/evidence.py:594", "src/codex_harness/completion.py:395"],
+      "tests": ["tests/test_core_isolation.py::test_legacy_manifest_is_explicitly_manifest_unbound"],
+      "coupling": "host-neutral",
+      "loc": 15,
+      "g1_hint": "drop: G1 starts clean; legacy acceptance only widens the attack surface."
+    },
+    {
+      "id": "EVI-24",
+      "name": "Output digests bind stdout and stderr",
+      "statement": "The SHA-256 of persisted stdout and stderr MUST be stored in both the manifest and the success receipt and recomputed on validation.",
+      "mechanism": "secure_file_digest of command.stdout/stderr after writing; stored as command_output.*_sha256 and receipt stdout_sha256/stderr_sha256; validate_manifest raises command_output_changed and completion OUTPUT_BINDING_MISMATCH.",
+      "threat": "Post-hoc editing of captured output to hide failures.",
+      "refs": ["src/codex_harness/evidence.py:185", "src/codex_harness/evidence.py:322", "src/codex_harness/evidence.py:603", "src/codex_harness/completion.py:503"],
+      "tests": ["tests/test_evidence.py::test_passing_verification_records_required_manifest_fields", "tests/test_core_isolation.py::test_new_command_output_content_mutation_is_detected"],
+      "coupling": "host-neutral",
+      "loc": 40,
+      "g1_hint": "keep."
+    },
+    {
+      "id": "EVI-25",
+      "name": "Strict exact-key manifest validation",
+      "statement": "Manifests MUST have exactly the expected keys and types, with regex-checked ids and hashes and well-formed artifact entries.",
+      "mechanism": "validate_manifest checks key-set equality, int schema_version, task_id and v-<32hex> attempt_id regexes, 64-hex contract/command/source digests, 40-64-hex tree hash, and a nonempty artifact list with exact keys and positive sizes.",
+      "threat": "Malformed or padded manifests slipping through lenient parsing.",
+      "refs": ["src/codex_harness/evidence.py:457", "src/codex_harness/evidence.py:483", "src/codex_harness/evidence.py:505", "src/codex_harness/evidence.py:543"],
+      "tests": ["tests/test_security_core.py::test_manifest_self_report_forgery_invalidates_success"],
+      "coupling": "host-neutral",
+      "loc": 90,
+      "g1_hint": "keep."
+    },
+    {
+      "id": "EVI-26",
+      "name": "Manifest timestamp zoned and not future",
+      "statement": "A manifest timestamp MUST be ISO-8601 with an explicit timezone and not later than now.",
+      "mechanism": "datetime.fromisoformat after Z replacement; naive or future timestamps raise invalid_manifest.",
+      "threat": "Pre-dated or future-dated evidence used to win ordering checks.",
+      "refs": ["src/codex_harness/evidence.py:518"],
+      "tests": ["tests/test_security_core.py::test_manifest_self_report_forgery_invalidates_success"],
+      "coupling": "host-neutral",
+      "loc": 14,
+      "g1_hint": "keep, though the harness clock in the receipt is the stronger source than a file field."
+    },
+    {
+      "id": "EVI-27",
+      "name": "Manifest bound to task and contract",
+      "statement": "When validated for a task, the manifest task id and contract hash MUST equal the task's current values.",
+      "mechanism": "validate_manifest(expected_task) raises invalid_manifest on a task mismatch and contract_drift on a contract-hash mismatch.",
+      "threat": "Replaying a manifest from another task or an older contract.",
+      "refs": ["src/codex_harness/evidence.py:532"],
+      "tests": ["tests/test_security_core.py::test_previous_contract_receipt_is_stale"],
+      "coupling": "host-neutral",
+      "loc": 6,
+      "g1_hint": "keep, and also require manifest artifact paths to equal the contract's artifact list."
+    },
+    {
+      "id": "EVI-28",
+      "name": "Secure manifest loading rules",
+      "statement": "A manifest MUST be loaded only if it is a non-symlink, nonempty, mode-0600 regular file inside the evidence root that parses as a UTF-8 JSON object.",
+      "mechanism": "_load_manifest_secure checks directory traversability, rejects a symlinked manifest, requires resolve() within .harness/evidence, lstat S_ISREG, size > 0 and mode 0600, reads via O_NOFOLLOW and maps errors to typed codes.",
+      "threat": "Symlinked, escaping or forged manifest files, or parser crashes on hostile input.",
+      "refs": ["src/codex_harness/evidence.py:385", "src/codex_harness/evidence.py:399", "src/codex_harness/evidence.py:417"],
+      "tests": ["tests/test_security_core.py::test_completion_and_report_reject_the_same_forged_manifest"],
+      "coupling": "posix",
+      "loc": 60,
+      "g1_hint": "keep, but check nlink and mode on the same fd that is read."
+    },
+    {
+      "id": "EVI-29",
+      "name": "Manifest alone is never authority",
+      "statement": "A manifest file MUST never prove success by itself; only a harness-appended success receipt whose manifest_content_hash matches can.",
+      "mechanism": "Completion takes the latest verification receipt (must be verification_succeeded) and compares sha256_file(manifest) to receipt.manifest_content_hash (MANIFEST_CHANGED); snapshot-changed runs leave an exit-0 manifest next to a failed receipt.",
+      "threat": "Editing a failed manifest to exit_code 0 or swapping in a forged manifest.",
+      "refs": ["src/codex_harness/completion.py:351", "src/codex_harness/completion.py:443", ".agents/skills/report/SKILL.md:21", ".agents/skills/verify/SKILL.md:16"],
+      "tests": ["tests/test_security_core.py::test_manifest_exit_code_one_to_zero_forgery_cannot_complete", "tests/test_completion_boundary.py::test_explicit_completion_remains_strict_after_manifest_rewrite"],
+      "coupling": "host-neutral",
+      "loc": 30,
+      "g1_hint": "keep: in G1 the receipt store must be unreachable to the agent for this to hold."
+    },
+    {
+      "id": "EVI-30",
+      "name": "Relative traversal-free artifact paths",
+      "statement": "Artifact and evidence paths MUST be non-empty, relative, drive-less and free of '..' components.",
+      "mechanism": "validate_relative_path normalizes backslashes and rejects absolute paths, Windows drives and '..' parts via PurePosixPath.",
+      "threat": "Path traversal to hash or reference files outside the workspace.",
+      "refs": ["src/codex_harness/util.py:271", "src/codex_harness/util.py:274"],
+      "tests": ["tests/test_evidence.py::test_path_traversal_is_rejected"],
+      "coupling": "host-neutral",
+      "loc": 11,
+      "g1_hint": "keep, but reject '.', which is currently accepted and hashes the whole workspace."
+    },
+    {
+      "id": "EVI-31",
+      "name": "Fd-anchored no-follow artifact hashing",
+      "statement": "Artifacts MUST be opened component-by-component relative to directory fds with O_NOFOLLOW and hashed from that same descriptor, failing closed when O_NOFOLLOW is unavailable.",
+      "mechanism": "hash_artifact opens the root with O_NOFOLLOW|O_DIRECTORY, openat()s each component via dir_fd, maps ELOOP/EMLINK to symlink_rejected, fstat-checks type and hashes with pread (sha256_fd) without reopening; _nofollow_flag raises filesystem_hardening_unavailable.",
+      "threat": "Symlink escapes and lookup-to-open swap races (TOCTOU).",
+      "refs": ["src/codex_harness/util.py:97", "src/codex_harness/util.py:318", "src/codex_harness/util.py:377", "src/codex_harness/util.py:80"],
+      "tests": ["tests/test_evidence.py::test_symlink_escape_is_rejected", "tests/test_security_core.py::test_fd_hashing_rejects_symlink_swap_between_lookup_and_open"],
+      "coupling": "posix",
+      "loc": 75,
+      "g1_hint": "keep: Node lacks openat, so implement via a small native or Python helper."
+    },
+    {
+      "id": "EVI-32",
+      "name": "Artifacts must be nonempty",
+      "statement": "Zero-byte files and directories containing no regular files MUST be rejected as artifacts.",
+      "mechanism": "hash_artifact and _directory_entries raise empty_artifact for st_size == 0 or an empty entry list; validate_manifest requires size >= 1.",
+      "threat": "Satisfying artifact requirements with placeholder empty files.",
+      "refs": ["src/codex_harness/util.py:393", "src/codex_harness/util.py:353", "src/codex_harness/util.py:408", "src/codex_harness/evidence.py:557"],
+      "tests": ["tests/test_evidence.py::test_empty_artifact_is_rejected"],
+      "coupling": "host-neutral",
+      "loc": 12,
+      "g1_hint": "keep (cheap), but nonempty is a weak content check."
+    },
+    {
+      "id": "EVI-33",
+      "name": "Canonical directory artifact digest",
+      "statement": "A directory artifact's hash MUST be a canonical digest over its sorted regular-file entries, rejecting symlinks and special files.",
+      "mechanism": "_directory_entries walks sorted listdir(fd) recursively via openat and records {path,size,sha256}; hash = sha256(canonical_json(entries)), size = sum; entries persist in manifest and receipt.",
+      "threat": "Ambiguous or order-dependent directory hashes; links smuggling external content.",
+      "refs": ["src/codex_harness/util.py:339", "src/codex_harness/util.py:403"],
+      "tests": [],
+      "coupling": "posix",
+      "loc": 54,
+      "g1_hint": "keep, with depth and fd limits (deep trees raise RecursionError)."
+    },
+    {
+      "id": "EVI-34",
+      "name": "Artifacts rehashed at validation time",
+      "statement": "Current-scope validation MUST recompute every artifact hash and require exact equality with the recorded entry.",
+      "mechanism": "validate_manifest(require_current_artifacts=True) calls hash_artifact and compares the full dict (artifact_changed); completion passes require_current for active tasks.",
+      "threat": "Replacing an artifact after verification.",
+      "refs": ["src/codex_harness/evidence.py:586", "src/codex_harness/completion.py:419"],
+      "tests": ["tests/test_evidence.py::test_artifact_tamper_invalidates_manifest"],
+      "coupling": "host-neutral",
+      "loc": 7,
+      "g1_hint": "keep."
+    },
+    {
+      "id": "EVI-35",
+      "name": "Artifacts inside declared scope at bootstrap",
+      "statement": "Every declared artifact MUST lie under one of the task's allowed scope paths.",
+      "mechanism": "begin_task validates each artifact with _path_in_scope against validated scope paths; hand-edited plans are not re-checked at verify time.",
+      "threat": "Declaring out-of-scope or harness-internal files as task artifacts.",
+      "refs": ["src/codex_harness/plan.py:493", "src/codex_harness/plan.py:545"],
+      "tests": [],
+      "coupling": "host-neutral",
+      "loc": 11,
+      "g1_hint": "modify: enforce at verification time too and forbid harness-owned paths."
+    },
+    {
+      "id": "EVI-36",
+      "name": "Source digest over entry identity",
+      "statement": "The source snapshot MUST hash every non-directory entry's path, type and content (symlinks by target bytes) and fail on special files.",
+      "mechanism": "source_digest sorts root.rglob('*'), lstats each entry, records regular {sha256,size,executable} or symlink {target_sha256,target_size}, raises unsupported_source_type otherwise, and hashes canonical_json(entries).",
+      "threat": "Undetected source changes between verification and completion.",
+      "refs": ["src/codex_harness/util.py:437"],
+      "tests": ["tests/test_security_core.py::test_source_digest_has_an_exact_type_and_executable_identity_vector", "tests/test_security_core.py::test_source_digest_distinguishes_symlink_targets_and_entry_types", "tests/test_security_core.py::test_source_digest_rejects_unsupported_special_entries"],
+      "coupling": "posix",
+      "loc": 40,
+      "g1_hint": "keep, but handle non-UTF-8 names, vanished files and unreadable directories explicitly."
+    },
+    {
+      "id": "EVI-37",
+      "name": "Host-stable digest normalization",
+      "statement": "Snapshot identity MUST ignore mtime, ownership and non-executable mode bits, recording only whether any execute bit is set.",
+      "mechanism": "source_digest stores executable = bool(st_mode & 0o111) and the lstat size with no timestamps; copytree copies produce identical digests.",
+      "threat": "Spurious invalidation from touch, chmod or copying across hosts.",
+      "refs": ["src/codex_harness/util.py:461"],
+      "tests": ["tests/test_security_core.py::test_source_digest_regular_file_and_host_stable_mode_policy"],
+      "coupling": "posix",
+      "loc": 9,
+      "g1_hint": "keep."
+    },
+    {
+      "id": "EVI-38",
+      "name": "Digest exclusion set for runtime state",
+      "statement": "Snapshots MUST exclude the harness's own runtime state and VCS metadata so harness writes never perturb them.",
+      "mechanism": "_DIGEST_IGNORED_PARTS = .git, .harness, .pytest_cache, __pycache__, .mypy_cache, .ruff_cache, matched against any path component; git add excludes .harness/**.",
+      "threat": "Self-invalidation from harness writes (evidence, ledger, caches).",
+      "refs": ["src/codex_harness/util.py:427", "src/codex_harness/util.py:444", "src/codex_harness/util.py:575"],
+      "tests": ["tests/test_security_core.py::test_source_digest_regular_file_and_host_stable_mode_policy"],
+      "coupling": "host-neutral",
+      "loc": 10,
+      "g1_hint": "modify: exclude only harness-owned paths; cache dirs such as __pycache__ can carry executable bytecode."
+    },
+    {
+      "id": "EVI-39",
+      "name": "Git tree hash via temporary index",
+      "statement": "The repository snapshot MUST be a real Git tree object built from a throwaway index, never touching the user's index, and must work without HEAD.",
+      "mechanism": "git_tree_hash checks the worktree, points GIT_INDEX_FILE at a temp path, runs read-tree --empty, add -A -- . ':(exclude).harness/**' and write-tree, validates 40-64 hex and deletes the temp index; blob and tree objects are written into .git/objects.",
+      "threat": "Snapshot gaps for untracked files; user index corruption.",
+      "refs": ["src/codex_harness/util.py:545", "src/codex_harness/util.py:562", "src/codex_harness/util.py:574"],
+      "tests": ["tests/test_security_core.py::test_no_head_snapshot_hash_is_authoritative"],
+      "coupling": "git",
+      "loc": 53,
+      "g1_hint": "experiment: written objects allow re-materializing the snapshot for reproduction, but use a harness-owned GIT_OBJECT_DIRECTORY and hardened git config."
+    },
+    {
+      "id": "EVI-40",
+      "name": "Deterministic Git subprocess environment",
+      "statement": "Harness Git calls MUST run with a minimal environment that disables global/system config and prompts and drops inherited repository overrides.",
+      "mechanism": "git_environment builds PATH, GIT_CONFIG_GLOBAL=/dev/null, GIT_CONFIG_NOSYSTEM=1, GIT_TERMINAL_PROMPT=0 plus locale/TZ; GIT_DIR, GIT_INDEX_FILE and GIT_WORK_TREE are not inherited.",
+      "threat": "Env-redirected repository or index, or interactive hangs during snapshotting.",
+      "refs": ["src/codex_harness/util.py:528"],
+      "tests": [],
+      "coupling": "git",
+      "loc": 15,
+      "g1_hint": "modify: also neutralize repo-local config (core.fsmonitor, filters, hooksPath) and call git by absolute path."
+    },
+    {
+      "id": "EVI-41",
+      "name": "Dual snapshot recorded and compared",
+      "statement": "Evidence MUST record both a content digest and a Git tree hash, and current-scope completion MUST require both to match the present repository.",
+      "mechanism": "record_manifest stores source_digest and git_tree_hash, the success receipt repeats them, and completion compares the receipt with current values (SOURCE_CHANGED/TREE_CHANGED) and with the manifest (binding mismatch).",
+      "threat": "Code changes after a passing run being credited to the old pass.",
+      "refs": ["src/codex_harness/evidence.py:197", "src/codex_harness/evidence.py:318", "src/codex_harness/completion.py:480"],
+      "tests": ["tests/test_security_core.py::test_source_mutation_after_success_invalidates_receipt", "tests/test_security_core.py::test_manifest_self_report_forgery_invalidates_success"],
+      "coupling": "git",
+      "loc": 25,
+      "g1_hint": "keep: the two digests cover each other's gaps (gitignored files versus excluded cache dirs)."
+    },
+    {
+      "id": "EVI-42",
+      "name": "Post-run snapshot stability re-check",
+      "statement": "After writing the manifest, the harness MUST recompute source, tree and artifact hashes and fail the run if any changed.",
+      "mechanism": "_current_binding recomputes on root; on mismatch passed=False and failure='verification_snapshot_changed' is recorded in verification_failed.",
+      "threat": "Background processes mutating files while evidence is recorded.",
+      "refs": ["src/codex_harness/evidence.py:220", "src/codex_harness/evidence.py:299"],
+      "tests": [],
+      "coupling": "git",
+      "loc": 15,
+      "g1_hint": "modify: add a pre-run snapshot and require pre == post (or record both); both T1 snapshots are post-run."
+    },
+    {
+      "id": "EVI-43",
+      "name": "Read-only surfaces never snapshot or write",
+      "statement": "Diagnostic and projection surfaces MUST NOT compute snapshots, write files or add Git objects; they report recorded state only.",
+      "mechanism": "The SessionStart projection, doctor and report use latest_verification_state or load_completion_state(include_current=False) and never call source_digest or git_tree_hash.",
+      "threat": "Observation perturbing evidence (object writes, bytecode), or diagnostics posing as current verification.",
+      "refs": ["src/codex_harness/hooks.py:88", "src/codex_harness/doctor.py:270", "src/codex_harness/reporting.py:22"],
+      "tests": ["tests/test_completion_boundary.py::test_doctor_and_report_never_call_source_or_tree_digest", "tests/test_completion_boundary.py::test_read_only_surfaces_add_no_git_objects_or_repository_bytes", "tests/test_core_isolation.py::test_session_start_is_zero_write_for_active_task"],
+      "coupling": "host-neutral",
+      "loc": 5,
+      "g1_hint": "keep."
+    },
+    {
+      "id": "EVI-44",
+      "name": "Write-ahead verification_started receipt",
+      "statement": "A verification_started receipt (attempt id, contract hash, command digest, workspace) MUST be appended before the command runs.",
+      "mechanism": "verify_task appends it before execution and the ledger validates its fields; a start without a terminal receipt leaves the latest event 'started', which blocks completion.",
+      "threat": "Crashed or killed runs disappearing without trace.",
+      "refs": ["src/codex_harness/evidence.py:252", "src/codex_harness/ledger.py:958", "src/codex_harness/completion.py:351"],
+      "tests": ["tests/test_security_core.py::test_verification_failed_only_never_completes"],
+      "coupling": "host-neutral",
+      "loc": 35,
+      "g1_hint": "keep, and require the terminal receipt to reference the started attempt_id."
+    },
+    {
+      "id": "EVI-45",
+      "name": "Success receipt binds full evidence tuple",
+      "statement": "A verification_succeeded receipt MUST bind task, contract, attempt, manifest path and content hash, command digest, exit 0, source digest, tree hash, artifact hashes, verification timestamp and output digests.",
+      "mechanism": "verify_task appends these fields; the ledger schema validates them; completion requires the authoritative field set and cross-checks each against the manifest.",
+      "threat": "Partial receipts that can be paired with substituted evidence.",
+      "refs": ["src/codex_harness/evidence.py:309", "src/codex_harness/ledger.py:987", "src/codex_harness/completion.py:26", "src/codex_harness/completion.py:383"],
+      "tests": ["tests/test_evidence.py::test_passing_verification_records_required_manifest_fields", "tests/test_security_core.py::test_cross_task_success_receipt_cannot_reuse_manifest"],
+      "coupling": "host-neutral",
+      "loc": 110,
+      "g1_hint": "keep; in G1 sign or MAC receipts with a key the agent cannot read."
+    },
+    {
+      "id": "EVI-46",
+      "name": "Failure receipts classify cause",
+      "statement": "Every non-passing run MUST append verification_failed with exit code, timeout flag, manifest reference and a failure code.",
+      "mechanism": "Failure codes are verification_command_failed, verification_snapshot_changed or the HarnessError code (exit 70); append errors in the error path are swallowed.",
+      "threat": "Failures being silently dropped so an older success looks current.",
+      "refs": ["src/codex_harness/evidence.py:325", "src/codex_harness/evidence.py:338", "src/codex_harness/ledger.py:1092"],
+      "tests": ["tests/test_security_core.py::test_later_failure_or_explicit_invalidation_blocks_current", "tests/test_security_core.py::test_verification_failed_only_never_completes"],
+      "coupling": "host-neutral",
+      "loc": 65,
+      "g1_hint": "keep, but catch all exceptions; non-HarnessError exceptions currently skip the receipt."
+    },
+    {
+      "id": "EVI-47",
+      "name": "Random attempt id links manifest and receipt",
+      "statement": "Each run MUST get an unpredictable attempt id carried by the started receipt, manifest and terminal receipt, and completion MUST require manifest and receipt ids to match.",
+      "mechanism": "attempt_id = 'v-' + uuid4().hex; validate_manifest and the ledger enforce the v-<32hex> pattern; completion raises ATTEMPT_MISMATCH.",
+      "threat": "Pairing a receipt with a manifest from a different run.",
+      "refs": ["src/codex_harness/evidence.py:248", "src/codex_harness/evidence.py:487", "src/codex_harness/completion.py:452"],
+      "tests": ["tests/test_security_core.py::test_manifest_self_report_forgery_invalidates_success"],
+      "coupling": "host-neutral",
+      "loc": 8,
+      "g1_hint": "keep."
+    },
+    {
+      "id": "EVI-48",
+      "name": "Success receipt freshness window",
+      "statement": "The success receipt MUST be appended no earlier than, and within 60 s of, the verification timestamp, which must equal the manifest timestamp.",
+      "mechanism": "verify_task takes utc_now() right after the command; completion checks equality with the manifest (TIMESTAMP_MISMATCH) and the 0-60 s window (TIMESTAMP_STALE).",
+      "threat": "Late-appended or replayed success receipts.",
+      "refs": ["src/codex_harness/evidence.py:283", "src/codex_harness/completion.py:456", "src/codex_harness/completion.py:472"],
+      "tests": [],
+      "coupling": "host-neutral",
+      "loc": 24,
+      "g1_hint": "modify: measure from the end of snapshotting or scale the window; slow hosts can exceed 60 s."
+    },
+    {
+      "id": "EVI-49",
+      "name": "Bounded 512-byte SessionStart projection",
+      "statement": "Session start MUST inject at most 512 bytes of recorded task state: task id, status, first unchecked criterion, recorded verification state and a status command.",
+      "mechanism": "_bounded_projection builds one line (criterion cut to 120 chars), raises projection_too_large above 512 encoded bytes, or emits a fixed no-active-task message; delivered as hookSpecificOutput.additionalContext.",
+      "threat": "Context bloat, and the model losing task continuity after compaction or resume.",
+      "refs": ["src/codex_harness/hooks.py:15", "src/codex_harness/hooks.py:88", "src/codex_harness/hooks.py:130"],
+      "tests": ["tests/test_completion_boundary.py::test_session_start_source_matrix_is_bounded_and_zero_write", "tests/test_core_isolation.py::test_no_active_projection_matrix_is_exact_bounded_and_zero_write", "tests/test_core_isolation.py::test_acceptance_complete_active_projection_verification_states"],
+      "coupling": "codex",
+      "loc": 48,
+      "g1_hint": "modify: port to omp's session-start hook, truncate by bytes, and label verification state as recorded, not current."
+    },
+    {
+      "id": "EVI-50",
+      "name": "Fail-open SessionStart hook output",
+      "statement": "Projection failures MUST never block the session: errors become a typed systemMessage with continue=true, and unknown events pass through.",
+      "mechanism": "handle_hook wraps root resolution and projection in except Exception and returns {continue: true, systemMessage: 'T1 SessionStart failed [code]: ...'}; non-SessionStart events return {continue: true}.",
+      "threat": "A harness bug or hostile state locking the user out of the agent.",
+      "refs": ["src/codex_harness/hooks.py:140", "src/codex_harness/hooks.py:155"],
+      "tests": ["tests/test_completion_boundary.py::test_turn_boundary_and_unknown_event_leave_active_task_durable", "tests/test_core_isolation.py::test_multiple_active_tasks_fail_with_typed_ambiguity"],
+      "coupling": "codex",
+      "loc": 27,
+      "g1_hint": "keep for projection only; G1 enforcement gates must fail closed instead."
+    },
+    {
+      "id": "EVI-51",
+      "name": "Hook root resolution rejects symlinks",
+      "statement": "The hook root MUST be the symlink-free Git top-level of the event cwd and equal the wrapper's own root, with a real .harness dir and regular plan.md; HARNESS_ROOT is ignored.",
+      "mechanism": "_real_directory compares abspath with resolve(strict=True); _git_top_level runs git rev-parse --show-toplevel; resolve_hook_root raises hook_root_mismatch, hook_root_symlink_mismatch or hook_root_invalid.",
+      "threat": "Projecting another repository's state or following a symlinked root into attacker-controlled state.",
+      "refs": ["src/codex_harness/hooks.py:22", "src/codex_harness/hooks.py:42", "src/codex_harness/hooks.py:56", ".codex/hooks/harness_hook.py:9"],
+      "tests": ["tests/test_completion_boundary.py::test_explicit_hook_root_mismatch_is_read_only", "tests/test_completion_boundary.py::test_symlinked_hook_root_is_rejected_read_only", "tests/test_completion_boundary.py::test_harness_root_environment_cannot_redirect_session_start"],
+      "coupling": "git",
+      "loc": 75,
+      "g1_hint": "modify: take the root from omp session config; any symlinked ancestor (e.g. Android /sdcard) currently fails."
+    },
+    {
+      "id": "EVI-52",
+      "name": "Plan/ledger task mismatch is surfaced",
+      "statement": "If the ledger registers task ids absent from the plan, projection MUST fail and doctor MUST report plan_ledger_task_mismatch rather than reconstruct.",
+      "mechanism": "plan_ledger_task_mismatch diffs contract_registered task ids against plan task ids; _bounded_projection raises; doctor and report add an issue.",
+      "threat": "Agent deleting a task from the plan to hide its failed history.",
+      "refs": ["src/codex_harness/hooks.py:92", "src/codex_harness/plan.py:108", "src/codex_harness/doctor.py:263"],
+      "tests": ["tests/test_completion_boundary.py::test_plan_ledger_mismatch_is_reported_without_reconstruction"],
+      "coupling": "host-neutral",
+      "loc": 23,
+      "g1_hint": "keep."
+    },
+    {
+      "id": "EVI-53",
+      "name": "Generated hook manifest with drift check",
+      "statement": "Host hook configuration MUST be generated from code and checked for drift rather than hand-edited.",
+      "mechanism": "expected_hook_manifest() yields one SessionStart command hook (matcher startup|resume|clear|compact, timeout 10, additionalContextLimit 512); render_hooks.py writes it or --check compares; check_contracts and doctor also compare.",
+      "threat": "Silent hook config edits adding events or changing the command.",
+      "refs": ["src/codex_harness/hook_manifest.py:6", "src/codex_harness/hook_manifest.py:12", "scripts/render_hooks.py:16", ".codex/hooks.json:1", "scripts/check_contracts.py:117"],
+      "tests": ["tests/test_contract_assets.py::test_generated_hook_manifest_has_exactly_one_event_and_no_drift"],
+      "coupling": "codex",
+      "loc": 100,
+      "g1_hint": "drop the Codex file; keep the idea of code-generated extension registration with a drift check."
+    },
+    {
+      "id": "EVI-54",
+      "name": "Thin symlink-guarded hook wrapper",
+      "statement": "The hook entry point MUST be a thin wrapper that refuses symlinked locations and passes its own derived root explicitly to the handler.",
+      "mechanism": "harness_hook.py compares abspath(__file__) with resolve(strict=True), sets ROOT = parents[2], imports codex_harness from ROOT/src and calls hook_main(root=ROOT); the hook command locates it via git rev-parse --show-toplevel.",
+      "threat": "Hook path redirection to foreign code.",
+      "refs": [".codex/hooks/harness_hook.py:9", ".codex/hooks/harness_hook.py:17", "src/codex_harness/hook_manifest.py:6"],
+      "tests": ["tests/test_core_isolation.py::test_hook_wrapper_creates_no_bytecode_or_cache", "tests/test_core_isolation.py::test_session_start_git_subprocess_count_is_bounded"],
+      "coupling": "codex",
+      "loc": 22,
+      "g1_hint": "modify: G1 hook code must live outside the agent-writable workspace (T1 imports repo src at run time)."
+    },
+    {
+      "id": "EVI-55",
+      "name": "Harness entry points never write bytecode",
+      "statement": "Harness processes and verifier children MUST NOT write bytecode or caches into the repository.",
+      "mechanism": "harnessctl and the hook wrapper set sys.dont_write_bytecode; the hook command uses python3 -B; the child env sets PYTHONDONTWRITEBYTECODE=1; conftest forces it for tests.",
+      "threat": "Observation perturbing source or tree digests (__pycache__ entering trees).",
+      "refs": ["harnessctl:5", ".codex/hooks/harness_hook.py:6", "src/codex_harness/util.py:685", "tests/conftest.py:6"],
+      "tests": ["tests/test_completion_boundary.py::test_doctor_and_report_entrypoint_create_no_bytecode_in_clean_checkout", "tests/test_core_isolation.py::test_hook_wrapper_creates_no_bytecode_or_cache"],
+      "coupling": "host-neutral",
+      "loc": 6,
+      "g1_hint": "keep the principle: harness observation must not mutate the observed state."
+    },
+    {
+      "id": "EVI-56",
+      "name": "Doctor labels lifecycle-only facts",
+      "statement": "Diagnostics MUST state explicitly that they reflect recorded lifecycle facts and performed no authoritative current check.",
+      "mechanism": "doctor_report returns plan validity, ledger state, current or blocked task, evidence {state: recorded_lifecycle_only, authoritative_current_check_performed: false, explicit_completion_required: true}, issues and overall ok/warning; the CLI exits 0 or 1.",
+      "threat": "Users or agents mistaking a health check for verification.",
+      "refs": ["src/codex_harness/doctor.py:206", "src/codex_harness/doctor.py:270", "src/codex_harness/cli.py:42"],
+      "tests": ["tests/test_completion_boundary.py::test_doctor_and_report_never_call_source_or_tree_digest", "tests/test_core_isolation.py::test_default_doctor_performs_no_optional_hook_probe"],
+      "coupling": "host-neutral",
+      "loc": 104,
+      "g1_hint": "keep the labeling pattern; fix the crash on ambiguous active tasks."
+    },
+    {
+      "id": "EVI-57",
+      "name": "Optional Codex hook trust probe",
+      "statement": "Hook liveness MAY be checked only on request; a hook counts as active only if exactly SessionStart is discovered, all project hooks are trusted or managed and enabled, and the manifest has no drift.",
+      "mechanism": "query_codex_hooks spawns codex app-server and sends initialize, initialized and hooks/list over JSON-RPC; _hook_status filters source == project; _codex_hook_diagnostic ANDs with no drift; doctor adds codex-project-hooks:inactive.",
+      "threat": "Believing continuity hooks run when the host marked them untrusted or modified.",
+      "refs": ["src/codex_harness/doctor.py:13", "src/codex_harness/doctor.py:104", "src/codex_harness/doctor.py:150", "src/codex_harness/doctor.py:286"],
+      "tests": ["tests/test_doctor.py::test_doctor_marks_all_trusted_project_hooks_active", "tests/test_doctor.py::test_doctor_distinguishes_untrusted_and_modified_hooks", "tests/test_doctor.py::test_doctor_reports_undiscovered_hooks", "tests/test_completion_boundary.py::test_installed_but_untrusted_hooks_are_not_reported_active"],
+      "coupling": "codex",
+      "loc": 190,
+      "g1_hint": "drop: replace with an omp extension self-registration check."
+    },
+    {
+      "id": "EVI-58",
+      "name": "Root discovery by plan marker",
+      "statement": "The harness root is --root if given, else HARNESS_ROOT (which must contain .harness/plan.md), else the nearest ancestor of cwd containing .harness/plan.md.",
+      "mechanism": "find_root resolves HARNESS_ROOT or walks cwd parents; cli._root prefers --root; hooks ignore HARNESS_ROOT.",
+      "threat": "Operating on the wrong repository.",
+      "refs": ["src/codex_harness/util.py:251", "src/codex_harness/cli.py:29"],
+      "tests": ["tests/test_completion_boundary.py::test_harness_root_environment_cannot_redirect_session_start"],
+      "coupling": "host-neutral",
+      "loc": 20,
+      "g1_hint": "modify: fix the root in extension config and never read it from agent-controllable env vars."
+    },
+    {
+      "id": "EVI-59",
+      "name": "Contained in-root path resolution",
+      "statement": "Referenced evidence paths MUST validate as relative, contain no symlinked component, resolve inside the root and exist.",
+      "mechanism": "resolve_in_root walks each prefix with is_symlink(), checks resolve(strict=False) is relative_to(root) and exists(); used for manifest output paths and CLI --workspace.",
+      "threat": "Manifest output paths pointing outside the repo or through links.",
+      "refs": ["src/codex_harness/util.py:284", "src/codex_harness/evidence.py:609"],
+      "tests": ["tests/test_core_isolation.py::test_new_command_output_file_security_is_enforced"],
+      "coupling": "posix",
+      "loc": 32,
+      "g1_hint": "keep, preferring the fd-based walk to avoid path-based TOCTOU."
+    },
+    {
+      "id": "EVI-60",
+      "name": "Typed fail-closed error codes",
+      "statement": "Every harness failure MUST carry a stable machine code, and unexpected exceptions MUST fail closed without leaking tracebacks.",
+      "mechanism": "HarnessError(message, code); OSErrors are normalized to evidence_io, artifact_io or filesystem_io; the CLI prints ERROR[code] and exits 2, internal_error with the type name only, 130 on interrupt.",
+      "threat": "Ambiguous failures treated as success, or internals leaking to the agent.",
+      "refs": ["src/codex_harness/util.py:16", "src/codex_harness/cli.py:584", "src/codex_harness/evidence.py:101"],
+      "tests": ["tests/test_security_core.py::test_ledger_open_io_errors_are_normalized"],
+      "coupling": "host-neutral",
+      "loc": 25,
+      "g1_hint": "keep."
+    },
+    {
+      "id": "EVI-61",
+      "name": "Canonical JSON and UTC timestamps",
+      "statement": "All hashed structures MUST use canonical JSON (sorted keys, compact separators, no NaN), and timestamps MUST be UTC millisecond ISO-8601 with Z.",
+      "mechanism": "canonical_json for digests, pretty_json (sorted, indented) for files, utc_now for timestamps.",
+      "threat": "Non-deterministic hashes across runs or hosts.",
+      "refs": ["src/codex_harness/util.py:24", "src/codex_harness/util.py:32", "src/codex_harness/util.py:42"],
+      "tests": ["tests/test_security_core.py::test_source_digest_has_an_exact_type_and_executable_identity_vector"],
+      "coupling": "host-neutral",
+      "loc": 20,
+      "g1_hint": "keep."
+    },
+    {
+      "id": "EVI-62",
+      "name": "Verify skill advisory rules",
+      "statement": "Agent-facing verify guidance forbids self-report evidence and lists the rejection conditions, but enforcement lives in code.",
+      "mechanism": "SKILL.md: run harnessctl verify, never turn self-report into evidence, reject nonzero/timeout/empty/symlink/escape/drift, failed runs cannot be resurrected; openai.yaml allows implicit invocation; check_contracts enforces the sections.",
+      "threat": "principle (agent guidance)",
+      "refs": [".agents/skills/verify/SKILL.md:1", ".agents/skills/verify/agents/openai.yaml:1", "scripts/check_contracts.py:90"],
+      "tests": ["tests/test_contract_assets.py::test_repository_control_contract_checker_passes"],
+      "coupling": "codex",
+      "loc": 28,
+      "g1_hint": "modify: G1 never relies on agent compliance; keep only as prompt text mirroring enforced checks."
+    },
+    {
+      "id": "EVI-63",
+      "name": "Report skill factual taxonomy",
+      "statement": "Reports MUST separate passed, failed and unverified facts, cite receipts and paths, avoid confidence language, and never present historical completion as current verification.",
+      "mechanism": "SKILL.md workflow: harnessctl report --json (optionally --require-complete), derived output only, run twice to confirm canonical state is unchanged.",
+      "threat": "Confidence language or stale results masquerading as evidence.",
+      "refs": [".agents/skills/report/SKILL.md:1", ".agents/skills/report/SKILL.md:20"],
+      "tests": ["tests/test_security_core.py::test_completion_and_report_reject_the_same_forged_manifest"],
+      "coupling": "codex",
+      "loc": 27,
+      "g1_hint": "keep as the output contract for G1's own generated reports."
+    },
+    {
+      "id": "EVI-64",
+      "name": "Harness self-integrity and dependency pins",
+      "statement": "The harness's own code, hook directory, ledger event set and dependency list MUST be pinned so unreviewed changes are detected.",
+      "mechanism": "A test pins path_tree_digest of src/codex_harness and .codex, the sha256 of scripts/run_fresh_turn.py, _CURRENT_EVENT_TYPES, zero pyproject dependencies and a single lock file.",
+      "threat": "Agent weakening the harness itself, e.g. by editing validation code.",
+      "refs": ["tests/test_contract_assets.py:65", "src/codex_harness/util.py:479", "pyproject.toml:10"],
+      "tests": ["tests/test_contract_assets.py::test_master_goal_valid_structure_and_runtime_anchors_are_unchanged"],
+      "coupling": "host-neutral",
+      "loc": 55,
+      "g1_hint": "modify: check the extension's own hash at load time from outside agent-writable paths, not in a test the agent can edit."
+    }
+  ],
+  "findings": [
+    {
+      "kind": "bug",
+      "detail": "scrubbed_environment secures runtime_dir with ensure_secure_directory and no boundary, so every ancestor from the first path component down (/home, /home/<user>, the repo root, ...) is fchmod'ed to 0700. On standard Linux as non-root this raises EPERM on root-owned ancestors, so every verification fails with filesystem_io. Under proot fake ownership it silently tightens ancestors: /home, /home/user, /home/user/src, /home/user/src/t1 and /tmp are all 0700 on this host.",
+      "refs": ["src/codex_harness/util.py:655", "src/codex_harness/util.py:199", "src/codex_harness/util.py:237", "src/codex_harness/evidence.py:276"]
+    },
+    {
+      "kind": "bug",
+      "detail": "verify_task catches only HarnessError. These escape without a verification_failed receipt, leave a dangling verification_started and surface as internal_error: UnicodeDecodeError from text=True on non-UTF-8 output (confirmed) or from .decode() of partial timeout bytes; OSError from mkdtemp or Popen; FileNotFoundError when files vanish during the source_digest walk; UnicodeEncodeError for non-UTF-8 filenames in canonical_json (confirmed); RecursionError in deep artifact dirs.",
+      "refs": ["src/codex_harness/evidence.py:136", "src/codex_harness/evidence.py:144", "src/codex_harness/evidence.py:338", "src/codex_harness/util.py:446", "src/codex_harness/util.py:476", "src/codex_harness/util.py:366"]
+    },
+    {
+      "kind": "bug",
+      "detail": "The SessionStart projection truncates the criterion to 120 characters but enforces a 512-byte limit. Non-ASCII text (e.g. Korean, 3 bytes/char) of about 110+ chars with a typical task id exceeds the limit, so projection_too_large fires and no context is injected.",
+      "refs": ["src/codex_harness/hooks.py:114", "src/codex_harness/hooks.py:121"]
+    },
+    {
+      "kind": "bug",
+      "detail": "doctor_report catches current_task_ambiguous, then calls build_report, which calls current_task unguarded and re-raises. With two active tasks 'harnessctl doctor' exits 2 with ERROR instead of reporting a warning. Untested.",
+      "refs": ["src/codex_harness/doctor.py:232", "src/codex_harness/doctor.py:266", "src/codex_harness/reporting.py:19"]
+    },
+    {
+      "kind": "bug",
+      "detail": "query_codex_hooks mixes select() on the pipe fd with buffered TextIOWrapper.readline(). If the initialize and hooks/list replies arrive in one chunk, the second sits in the Python buffer while select() reports not-ready, giving a spurious 'hooks/list timed out'. Also, stderr is piped but never drained, and the full parent env (including secrets) is passed to codex.",
+      "refs": ["src/codex_harness/doctor.py:30", "src/codex_harness/doctor.py:66", "src/codex_harness/doctor.py:73"]
+    },
+    {
+      "kind": "bug",
+      "detail": "validate_relative_path accepts '.' because PurePosixPath('.').parts is empty, so an artifact '.' hashes the entire workspace including .git and .harness, and resolve_in_root('.') returns the root. The '' and '.' part checks are unreachable because PurePosixPath already collapses 'a/./b' and 'a//b' (confirmed).",
+      "refs": ["src/codex_harness/util.py:274", "src/codex_harness/util.py:279"]
+    },
+    {
+      "kind": "bug",
+      "detail": "Completion rejects success receipts appended more than 60 s after verification_timestamp. The harness takes that timestamp right after the command, then writes outputs, hashes artifacts, runs source_digest plus git add (timeout 120 s) twice, and waits on the ledger lock. Large repos or slow storage (proot/Android) produce receipts that can never complete (TIMESTAMP_STALE).",
+      "refs": ["src/codex_harness/evidence.py:283", "src/codex_harness/evidence.py:299", "src/codex_harness/completion.py:472", "src/codex_harness/util.py:577"]
+    },
+    {
+      "kind": "bug",
+      "detail": "secret_environment_values uses 'environment or os.environ', so an explicitly empty mapping silently falls back to the full process environment.",
+      "refs": ["src/codex_harness/util.py:627"]
+    },
+    {
+      "kind": "inconsistency",
+      "detail": "verify --command runs an arbitrary command and still appends verification_succeeded. latest_verification_state, the SessionStart projection and report next_action then show succeeded/complete_explicitly, although completion rejects it with PUBLIC_COMMAND_MISMATCH.",
+      "refs": ["src/codex_harness/evidence.py:245", "src/codex_harness/cli.py:560", "src/codex_harness/completion.py:179", "src/codex_harness/reporting.py:84"]
+    },
+    {
+      "kind": "inconsistency",
+      "detail": "Denied-root PATH filtering applies only to the verifier child. Harness git calls (git_tree_hash, hook top-level) use the raw parent PATH, so a repo-local 'git' on PATH could forge tree hashes. Relative PATH entries are resolved against the harness cwd instead of the child cwd (root), so '.' or 'bin' survive when the harness is invoked with --root from elsewhere.",
+      "refs": ["src/codex_harness/util.py:532", "src/codex_harness/util.py:668", "src/codex_harness/hooks.py:43"]
+    },
+    {
+      "kind": "limitation",
+      "detail": "git_tree_hash disables only global and system config. Repo-local .git/config, .gitattributes and info/exclude still apply, so core.fsmonitor or clean filters can run agent-controlled code during snapshotting and alter staged bytes. The temp index name is unlinked then reused in shared /tmp, a stale index.lock is not cleaned up, and unreachable objects accumulate in .git/objects on every verification.",
+      "refs": ["src/codex_harness/util.py:528", "src/codex_harness/util.py:562", "src/codex_harness/util.py:574"]
+    },
+    {
+      "kind": "limitation",
+      "detail": "Snapshot blind spots: source_digest skips __pycache__, .pytest_cache, .mypy_cache and .ruff_cache at any depth, and git add honors .gitignore (the repo ignores __pycache__/). A planted unchecked-hash .pyc can therefore change runtime behavior invisibly to both digests. pathlib rglob silently skips unreadable directories (Python 3.13 glob swallows scandir OSError). The walk still enumerates .git and ignored trees, so its cost grows with every verification.",
+      "refs": ["src/codex_harness/util.py:427", "src/codex_harness/util.py:442", ".gitignore:10"]
+    },
+    {
+      "kind": "limitation",
+      "detail": "There is no pre-run snapshot: both snapshots are taken after the command. A verifier that edits sources after its tests binds evidence to an untested state, and the re-check only catches changes during recording. Timeout kills only bash (no process group), so orphans and detached background jobs can keep mutating the tree after the receipt.",
+      "refs": ["src/codex_harness/evidence.py:130", "src/codex_harness/evidence.py:277", "src/codex_harness/evidence.py:299"]
+    },
+    {
+      "kind": "limitation",
+      "detail": "Same-uid trust: evidence files, the ledger and Ledger.append are writable or callable by any process running as the agent's user, and the tests forge receipts exactly this way. 0600/0700 modes do not separate harness from agent, so a consistent forged manifest + outputs + receipt passes completion.",
+      "refs": ["src/codex_harness/evidence.py:309", "tests/test_security_core.py:116", "src/codex_harness/util.py:182"]
+    },
+    {
+      "kind": "limitation",
+      "detail": "The verifier is agent-controlled: the contract hash binds the command text, not the tests, conftest.py, repo modules on sys.path or scripts it runs. Exit 0 proves only that agent-writable code exited 0.",
+      "refs": ["src/codex_harness/evidence.py:245", "src/codex_harness/evidence.py:277", "src/codex_harness/plan.py:51"]
+    },
+    {
+      "kind": "inconsistency",
+      "detail": "Receipt and manifest linkage gaps: terminal receipts need not follow a verification_started with the same attempt_id, and completion never consults the started receipt. validate_manifest never checks artifact paths against expected_task.artifacts, or output paths against the task-local evidence dir.",
+      "refs": ["src/codex_harness/ledger.py:958", "src/codex_harness/ledger.py:2070", "src/codex_harness/completion.py:351", "src/codex_harness/evidence.py:532", "src/codex_harness/evidence.py:603"]
+    },
+    {
+      "kind": "inconsistency",
+      "detail": "Validation drift. The JSON schema says const 3, additionalProperties false, loose artifact items and any workspace, while the validator accepts v2 and oracle fields and requires '.'; the schema is never used at run time. Manifest reads check mode via lstat and then reopen the path, never check nlink, and use resolve()-based containment, so a symlinked .harness/evidence passes until the output-path walk. Ledger artifact bindings allow size 0 while manifests require >= 1.",
+      "refs": ["schemas/evidence-manifest.schema.json:6", "schemas/evidence-manifest.schema.json:24", "src/codex_harness/evidence.py:399", "src/codex_harness/evidence.py:419", "src/codex_harness/util.py:69", "src/codex_harness/ledger.py:754"]
+    },
+    {
+      "kind": "inconsistency",
+      "detail": "Single-slot evidence: outputs are written before artifacts are hashed, so a failed artifact check leaves new outputs beside the previous manifest. Each attempt overwrites the previous manifest, so only the latest attempt can be re-validated.",
+      "refs": ["src/codex_harness/evidence.py:178", "src/codex_harness/evidence.py:187", "src/codex_harness/evidence.py:209"]
+    },
+    {
+      "kind": "inconsistency",
+      "detail": "Hook fail-open is partial. In-handler errors return exit 0 with a systemMessage, but invalid stdin exits 2 with no JSON, a symlinked wrapper path raises SystemExit text, and a non-git cwd makes the hook command run '/.codex/hooks/harness_hook.py'. Any symlinked ancestor (Android /sdcard, macOS /tmp) is rejected outright.",
+      "refs": ["src/codex_harness/hooks.py:157", "src/codex_harness/hooks.py:34", ".codex/hooks/harness_hook.py:12", "src/codex_harness/hook_manifest.py:7"]
+    },
+    {
+      "kind": "limitation",
+      "detail": "Codex trust covers only the hooks.json entry. The wrapper imports agent-writable src/codex_harness at run time, so editing hooks.py changes a 'trusted' hook without manifest drift. The projection also echoes agent-authored criterion text (up to 120 chars) into model context.",
+      "refs": [".codex/hooks/harness_hook.py:18", "src/codex_harness/hooks.py:105"]
+    },
+    {
+      "kind": "inconsistency",
+      "detail": "Duplicated constants and stale text: HOOK_EVENTS (set) duplicates REQUIRED_HOOK_EVENTS (tuple); _PROJECTION_LIMIT duplicates the literal 512 additionalContextLimit; the report skill says the receipt gate is used by 'hooks', but no hook gates anymore.",
+      "refs": ["src/codex_harness/hooks.py:14", "src/codex_harness/hook_manifest.py:9", "src/codex_harness/hook_manifest.py:33", ".agents/skills/report/SKILL.md:14"]
+    },
+    {
+      "kind": "limitation",
+      "detail": "Redaction gaps, confirmed by running the regexes: JSON-quoted keys ({'api_key': ...}), PEM private keys, JWTs, Slack xox*, Google AIza, Basic auth and bare 'Bearer x' all pass through, and ':' is rewritten to '='. Env secrets shorter than 4 chars or in encoded form are missed, and result.failure messages are unredacted. The raw-command digest permits brute-forcing low-entropy embedded secrets. The scrubbed env does not stop the verifier reading credential files by absolute path.",
+      "refs": ["src/codex_harness/util.py:609", "src/codex_harness/util.py:613", "src/codex_harness/util.py:635", "src/codex_harness/evidence.py:339", "src/codex_harness/evidence.py:194"]
+    },
+    {
+      "kind": "dead-code",
+      "detail": "Unused or unreachable code: util.redact_mapping and util.first_line (no callers); the read_bytes_nofollow mode param; the validate_manifest require_current_source branch (no caller passes True); the _hook_status root param (del root); the command_hook context_limit=None path; the hook_main 'output is not None' branch; CLI --workspace (verify_task rejects anything but root); the ''/'.' checks in validate_relative_path.",
+      "refs": ["src/codex_harness/util.py:600", "src/codex_harness/util.py:605", "src/codex_harness/util.py:134", "src/codex_harness/evidence.py:624", "src/codex_harness/doctor.py:107", "src/codex_harness/hook_manifest.py:22", "src/codex_harness/hooks.py:164", "src/codex_harness/cli.py:463"]
+    },
+    {
+      "kind": "limitation",
+      "detail": "Untested invariants: unsafe_workspace, verification_snapshot_changed, cleanup_warning, the timeout path, the PATH denied-root filter, redact_secrets patterns tested directly, manifest symlink/containment rejection, verification_command_drift and --command, projection_too_large, the artifact-in-scope bootstrap rule, and doctor with ambiguous active tasks.",
+      "refs": ["tests/test_evidence.py:1", "tests/test_security_core.py:1", "tests/test_doctor.py:1"]
+    }
+  ]
+}

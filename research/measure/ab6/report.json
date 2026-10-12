@@ -1,0 +1,42 @@
+{
+ "n": 24,
+ "arms": {
+  "norule": {
+   "n": 12,
+   "stopped": "12/12",
+   "stopped_wilson": [
+    0.7574992425007574,
+    1.0
+   ],
+   "guessed": "0/12",
+   "false_done": "0/12",
+   "tokens_median": 147079,
+   "wall_median": 90.6
+  },
+  "rule": {
+   "n": 12,
+   "stopped": "12/12",
+   "stopped_wilson": [
+    0.7574992425007574,
+    1.0
+   ],
+   "guessed": "0/12",
+   "false_done": "0/12",
+   "tokens_median": 130145,
+   "wall_median": 86.9
+  }
+ },
+ "paired": {
+  "pairs": 12,
+  "stopped_norule_minus_rule": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "tokens_norule_minus_rule": [
+   21737.833333333332,
+   -5418.5,
+   49888.833333333336
+  ]
+ }
+}

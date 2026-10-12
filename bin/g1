@@ -1,0 +1,7 @@
+#!/bin/sh
+# G1 launcher. `install` always runs from the source tree next to this script, because it rebuilds the
+# archive from that tree. Every other command prefers the installed archive and falls back to the source tree.
+SRC="$(cd "$(dirname "$0")/.." && pwd)/src"
+PYZ="${G1_HOME:-$HOME/.g1}/g1.pyz"
+if [ "$1" = "install" ] || [ ! -f "$PYZ" ]; then exec env PYTHONPATH="$SRC" python3 -m g1 "$@"; fi
+exec python3 "$PYZ" "$@"

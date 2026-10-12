@@ -1,0 +1,193 @@
+{
+  "agy_version": "1.3.3",
+  "model": "gemini-3.8-flash-low",
+  "date": "2026-10-11",
+  "global_hooks_path": "~/.gemini/config/hooks.json",
+  "runs": [
+    {
+      "run": "g-a-global-only",
+      "global_mode": {},
+      "workspace_hooks": false,
+      "hook_sequence": [
+        "global:SessionStart",
+        "global:PreToolUse",
+        "global:PreToolUse",
+        "global:Stop"
+      ],
+      "workspace_files": [
+        "README.md"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "I attempted to create `probe.txt` using the file-writing tool (and shell command), but the operation was denied by a pre-tool hook configured in your environment.",
+      "conversation_id": "f9b33de9-fd0d-42b1-afac-22e3e9647fc9"
+    },
+    {
+      "run": "g-b-both-log",
+      "global_mode": {
+        "PreToolUse": "noop"
+      },
+      "workspace_hooks": true,
+      "hook_sequence": [
+        "global:SessionStart",
+        "workspace:PreToolUse",
+        "global:PreToolUse",
+        "workspace:PreToolUse",
+        "global:PreToolUse",
+        "workspace:PreToolUse",
+        "global:PreToolUse",
+        "workspace:Stop",
+        "global:Stop"
+      ],
+      "workspace_files": [
+        "README.md"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "DONE",
+      "conversation_id": "16d35008-c650-4c05-91c9-f3574465ddc5"
+    },
+    {
+      "run": "g-c-global-allow-ws-deny",
+      "global_mode": {
+        "PreToolUse": "allow"
+      },
+      "workspace_hooks": true,
+      "hook_sequence": [
+        "global:SessionStart",
+        "global:PreToolUse",
+        "workspace:PreToolUse",
+        "global:Stop",
+        "workspace:Stop"
+      ],
+      "workspace_files": [
+        "README.md"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "DONE",
+      "conversation_id": "bb89a2bd-c87d-4b53-8727-2c40bb0ac6e3"
+    },
+    {
+      "run": "g-d-global-deny-ws-allow",
+      "global_mode": {
+        "PreToolUse": "deny"
+      },
+      "workspace_hooks": true,
+      "hook_sequence": [
+        "global:SessionStart",
+        "workspace:PreToolUse",
+        "global:PreToolUse",
+        "workspace:Stop",
+        "global:Stop"
+      ],
+      "workspace_files": [
+        "README.md"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "The tool call to create [probe.txt](file:///tmp/g1-probes/agy-probe/gruns/g-d-global-deny-ws-allow/ws/probe.txt) was denied by a pre-tool hook (`G1 global probe deny`).",
+      "conversation_id": "66613a17-50e0-4fee-906a-7dd6cccce433"
+    },
+    {
+      "run": "g-e1-global-empty-noskip",
+      "global_mode": {
+        "PreToolUse": "empty"
+      },
+      "workspace_hooks": false,
+      "hook_sequence": [
+        "global:SessionStart",
+        "global:PreToolUse",
+        "global:Stop"
+      ],
+      "workspace_files": [
+        "README.md",
+        "probe.txt"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "DONE",
+      "conversation_id": "bf21399d-aa6a-48c3-ad2c-06ece1beb23a"
+    },
+    {
+      "run": "g-e2-global-allow-noskip",
+      "global_mode": {
+        "PreToolUse": "allow"
+      },
+      "workspace_hooks": false,
+      "hook_sequence": [
+        "global:SessionStart",
+        "global:PreToolUse",
+        "global:Stop"
+      ],
+      "workspace_files": [
+        "README.md",
+        "probe.txt"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "DONE",
+      "conversation_id": "c6c19260-9220-4dbe-a7c1-f11cddfc282a"
+    },
+    {
+      "run": "g-f0-nohooks-write-noskip",
+      "global_mode": {},
+      "workspace_hooks": false,
+      "hook_sequence": [],
+      "workspace_files": [
+        "README.md",
+        "probe.txt"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "DONE",
+      "conversation_id": "db2fa06e-7a17-4f56-9fb1-9b63f27fde6f"
+    },
+    {
+      "run": "g-f1-nohooks-cmd-noskip",
+      "global_mode": {},
+      "workspace_hooks": false,
+      "hook_sequence": [],
+      "workspace_files": [
+        "README.md",
+        "cmd.txt"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "DONE",
+      "conversation_id": "d43293ae-14eb-4dae-b390-631a949b4a18"
+    },
+    {
+      "run": "g-f2-global-empty-cmd-noskip",
+      "global_mode": {
+        "PreToolUse": "empty"
+      },
+      "workspace_hooks": false,
+      "hook_sequence": [
+        "global:SessionStart",
+        "global:PreToolUse",
+        "global:PreToolUse",
+        "global:Stop"
+      ],
+      "workspace_files": [
+        "README.md",
+        "cmd.txt"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "DONE",
+      "conversation_id": "726ff768-cc8a-4c2d-bfd4-a0a34b1e7dba"
+    },
+    {
+      "run": "g-f3-global-allow-cmd-noskip",
+      "global_mode": {
+        "PreToolUse": "allow"
+      },
+      "workspace_hooks": false,
+      "hook_sequence": [
+        "global:SessionStart",
+        "global:PreToolUse",
+        "global:PreToolUse",
+        "global:Stop"
+      ],
+      "workspace_files": [
+        "README.md",
+        "cmd.txt"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "DONE",
+      "conversation_id": "7fb12d55-1c41-44fe-91a6-4d1deac1f3c5"
+    }
+  ]
+}

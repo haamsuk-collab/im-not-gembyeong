@@ -1,0 +1,192 @@
+{
+ "name": "c3-edit",
+ "model": "gemini-3.8-flash-high",
+ "rc": 0,
+ "seconds": 21.2,
+ "events": [
+  {
+   "event": "SessionStart",
+   "cid": "2a207eb4",
+   "step": null
+  },
+  {
+   "event": "PreInvocation",
+   "cid": "2a207eb4",
+   "step": null
+  },
+  {
+   "event": "PreToolUse",
+   "cid": "2a207eb4",
+   "step": 2,
+   "tool": "write_to_file",
+   "argKeys": [
+    "CodeContent",
+    "Description",
+    "Overwrite",
+    "TargetFile",
+    "toolAction",
+    "toolSummary"
+   ]
+  },
+  {
+   "event": "PostToolUse",
+   "cid": "2a207eb4",
+   "step": 2,
+   "tool": "write_to_file",
+   "argKeys": [
+    "CodeContent",
+    "Description",
+    "Overwrite",
+    "TargetFile",
+    "toolAction",
+    "toolSummary"
+   ]
+  },
+  {
+   "event": "PostInvocation",
+   "cid": "2a207eb4",
+   "step": null
+  },
+  {
+   "event": "PreInvocation",
+   "cid": "2a207eb4",
+   "step": null
+  },
+  {
+   "event": "PreToolUse",
+   "cid": "2a207eb4",
+   "step": 4,
+   "tool": "view_file",
+   "argKeys": [
+    "AbsolutePath",
+    "EndLine",
+    "StartLine",
+    "toolAction",
+    "toolSummary"
+   ]
+  },
+  {
+   "event": "PostToolUse",
+   "cid": "2a207eb4",
+   "step": 4,
+   "tool": "view_file",
+   "argKeys": [
+    "AbsolutePath",
+    "EndLine",
+    "StartLine",
+    "toolAction",
+    "toolSummary"
+   ]
+  },
+  {
+   "event": "PostInvocation",
+   "cid": "2a207eb4",
+   "step": null
+  },
+  {
+   "event": "PreInvocation",
+   "cid": "2a207eb4",
+   "step": null
+  },
+  {
+   "event": "PreToolUse",
+   "cid": "2a207eb4",
+   "step": 6,
+   "tool": "replace_file_content",
+   "argKeys": [
+    "AllowMultiple",
+    "Description",
+    "EndLine",
+    "Instruction",
+    "ReplacementContent",
+    "StartLine",
+    "TargetContent",
+    "TargetFile",
+    "toolAction",
+    "toolSummary"
+   ]
+  },
+  {
+   "event": "PostToolUse",
+   "cid": "2a207eb4",
+   "step": 6,
+   "tool": "replace_file_content",
+   "argKeys": [
+    "AllowMultiple",
+    "Description",
+    "EndLine",
+    "Instruction",
+    "ReplacementContent",
+    "StartLine",
+    "TargetContent",
+    "TargetFile",
+    "toolAction",
+    "toolSummary"
+   ]
+  },
+  {
+   "event": "PostInvocation",
+   "cid": "2a207eb4",
+   "step": null
+  },
+  {
+   "event": "PreInvocation",
+   "cid": "2a207eb4",
+   "step": null
+  },
+  {
+   "event": "PreToolUse",
+   "cid": "2a207eb4",
+   "step": 8,
+   "tool": "view_file",
+   "argKeys": [
+    "AbsolutePath",
+    "EndLine",
+    "StartLine",
+    "toolAction",
+    "toolSummary"
+   ]
+  },
+  {
+   "event": "PostToolUse",
+   "cid": "2a207eb4",
+   "step": 8,
+   "tool": "view_file",
+   "argKeys": [
+    "AbsolutePath",
+    "EndLine",
+    "StartLine",
+    "toolAction",
+    "toolSummary"
+   ]
+  },
+  {
+   "event": "PostInvocation",
+   "cid": "2a207eb4",
+   "step": null
+  },
+  {
+   "event": "PreInvocation",
+   "cid": "2a207eb4",
+   "step": null
+  },
+  {
+   "event": "PostInvocation",
+   "cid": "2a207eb4",
+   "step": null
+  },
+  {
+   "event": "Stop",
+   "cid": "2a207eb4",
+   "step": null
+  }
+ ],
+ "conversationIds": [
+  "2a207eb4-3166-40ca-814e-3f0f1ae39360"
+ ],
+ "files": [
+  "README.md",
+  "probe2.txt"
+ ],
+ "response": ""
+}

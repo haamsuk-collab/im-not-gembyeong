@@ -1,0 +1,184 @@
+{
+ "name": "c2-shell",
+ "model": "gemini-3.8-flash-high",
+ "rc": 0,
+ "seconds": 28.4,
+ "events": [
+  {
+   "event": "SessionStart",
+   "cid": "5a7dbddf",
+   "step": null
+  },
+  {
+   "event": "PreInvocation",
+   "cid": "5a7dbddf",
+   "step": null
+  },
+  {
+   "event": "PreToolUse",
+   "cid": "5a7dbddf",
+   "step": 2,
+   "tool": "run_command",
+   "argKeys": [
+    "CommandLine",
+    "Cwd",
+    "WaitMsBeforeAsync",
+    "toolAction",
+    "toolSummary"
+   ]
+  },
+  {
+   "event": "PostToolUse",
+   "cid": "5a7dbddf",
+   "step": 2,
+   "tool": "run_command",
+   "argKeys": [
+    "CommandLine",
+    "Cwd",
+    "WaitMsBeforeAsync",
+    "toolAction",
+    "toolSummary"
+   ]
+  },
+  {
+   "event": "PostInvocation",
+   "cid": "5a7dbddf",
+   "step": null
+  },
+  {
+   "event": "PreInvocation",
+   "cid": "5a7dbddf",
+   "step": null
+  },
+  {
+   "event": "PreToolUse",
+   "cid": "5a7dbddf",
+   "step": 4,
+   "tool": "run_command",
+   "argKeys": [
+    "BypassSandbox",
+    "CommandLine",
+    "Cwd",
+    "WaitMsBeforeAsync",
+    "toolAction",
+    "toolSummary"
+   ]
+  },
+  {
+   "event": "PostToolUse",
+   "cid": "5a7dbddf",
+   "step": 4,
+   "tool": "run_command",
+   "argKeys": [
+    "BypassSandbox",
+    "CommandLine",
+    "Cwd",
+    "WaitMsBeforeAsync",
+    "toolAction",
+    "toolSummary"
+   ]
+  },
+  {
+   "event": "PostInvocation",
+   "cid": "5a7dbddf",
+   "step": null
+  },
+  {
+   "event": "PreInvocation",
+   "cid": "5a7dbddf",
+   "step": null
+  },
+  {
+   "event": "PreToolUse",
+   "cid": "5a7dbddf",
+   "step": 6,
+   "tool": "run_command",
+   "argKeys": [
+    "CommandLine",
+    "Cwd",
+    "WaitMsBeforeAsync",
+    "toolAction",
+    "toolSummary"
+   ]
+  },
+  {
+   "event": "PostToolUse",
+   "cid": "5a7dbddf",
+   "step": 6,
+   "tool": "run_command",
+   "argKeys": [
+    "CommandLine",
+    "Cwd",
+    "WaitMsBeforeAsync",
+    "toolAction",
+    "toolSummary"
+   ]
+  },
+  {
+   "event": "PostInvocation",
+   "cid": "5a7dbddf",
+   "step": null
+  },
+  {
+   "event": "PreInvocation",
+   "cid": "5a7dbddf",
+   "step": null
+  },
+  {
+   "event": "PreToolUse",
+   "cid": "5a7dbddf",
+   "step": 8,
+   "tool": "run_command",
+   "argKeys": [
+    "BypassSandbox",
+    "CommandLine",
+    "Cwd",
+    "WaitMsBeforeAsync",
+    "toolAction",
+    "toolSummary"
+   ]
+  },
+  {
+   "event": "PostToolUse",
+   "cid": "5a7dbddf",
+   "step": 8,
+   "tool": "run_command",
+   "argKeys": [
+    "BypassSandbox",
+    "CommandLine",
+    "Cwd",
+    "WaitMsBeforeAsync",
+    "toolAction",
+    "toolSummary"
+   ]
+  },
+  {
+   "event": "PostInvocation",
+   "cid": "5a7dbddf",
+   "step": null
+  },
+  {
+   "event": "PreInvocation",
+   "cid": "5a7dbddf",
+   "step": null
+  },
+  {
+   "event": "PostInvocation",
+   "cid": "5a7dbddf",
+   "step": null
+  },
+  {
+   "event": "Stop",
+   "cid": "5a7dbddf",
+   "step": null
+  }
+ ],
+ "conversationIds": [
+  "5a7dbddf-b001-483c-8c7a-1698628b46eb"
+ ],
+ "files": [
+  "README.md",
+  "cmd.txt"
+ ],
+ "response": ""
+}

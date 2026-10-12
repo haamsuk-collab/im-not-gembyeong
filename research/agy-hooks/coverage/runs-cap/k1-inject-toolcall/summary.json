@@ -1,0 +1,17 @@
+{
+ "name": "k1-inject-toolcall",
+ "case": "inject_toolcall",
+ "rc": 3,
+ "seconds": 6.9,
+ "status": "ERROR",
+ "nonce": "NONCE-9A8AA9C0",
+ "nonce_in_reply": false,
+ "files": [
+  "G1_STATE.md",
+  "README.md"
+ ],
+ "response": "",
+ "total_tokens": 0,
+ "sequence": "SessionStart > PreInvocation[inv=0] > Stop",
+ "stderr_tail": "error: agent executor error: pre-invocation hook: failed to inject steps from hook jsonhook__g1-cap_PreInvocation_0_0: unknown injected step type: <nil>\nAGY_ERROR: {\"short_error\":\"agent executor error: pre-invocation hook: failed to inject steps from hook jsonhook__g1-cap_PreInvocation_0_0: unknown injected step type: \\u003cnil\\u003e\",\"status\":\"UNKNOWN\",\"error_code\":2,\"code_kind\":\"grpc\",\"retryable\":false,\"error_id\":\"839aeeca-d287-4555-b172-4dabe223327f-1\"}\n"
+}

@@ -1,0 +1,6 @@
+{"arm": "no_check_cmd", "rep": 0, "g1_status": "complete", "oracle": 0, "tokens": 247137, "wall_s": 196.9, "mutating_calls": 32}
+{"arm": "default", "rep": 0, "g1_status": "complete", "oracle": 0, "tokens": 235349, "wall_s": 159.4, "mutating_calls": 31}
+{"arm": "default", "rep": 1, "g1_status": "complete", "oracle": 0, "tokens": 145697, "wall_s": 128.9, "mutating_calls": 21}
+{"arm": "no_check_cmd", "rep": 1, "g1_status": "complete", "oracle": 0, "tokens": 265472, "wall_s": 220.6, "mutating_calls": 42}
+{"arm": "default", "rep": 2, "g1_status": "complete", "oracle": 0, "tokens": 204047, "wall_s": 154.6, "mutating_calls": 27}
+{"arm": "no_check_cmd", "rep": 2, "g1_status": "complete", "oracle": 0, "tokens": 238656, "wall_s": 283.7, "mutating_calls": 34}

@@ -1,0 +1,4 @@
+{"event": "PreToolUse", "t": 1791699654.8421595, "conversationId": "5c2f3fe3-be76-4c9d-a151-26cda8dc831a", "stepIdx": 2, "tool": "write_to_file", "fullyIdle": null, "terminationReason": null}
+{"event": "PreToolUse", "t": 1791699657.483903, "conversationId": "5c2f3fe3-be76-4c9d-a151-26cda8dc831a", "stepIdx": 4, "tool": "run_command", "fullyIdle": null, "terminationReason": null}
+{"event": "PreToolUse", "t": 1791699659.8337216, "conversationId": "5c2f3fe3-be76-4c9d-a151-26cda8dc831a", "stepIdx": 6, "tool": "view_file", "fullyIdle": null, "terminationReason": null}
+{"event": "Stop", "t": 1791699663.289896, "conversationId": "5c2f3fe3-be76-4c9d-a151-26cda8dc831a", "stepIdx": null, "tool": null, "fullyIdle": true, "terminationReason": "NO_TOOL_CALL"}

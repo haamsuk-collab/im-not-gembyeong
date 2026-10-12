@@ -1,0 +1,1277 @@
+{
+  "scope": "lifecycle",
+  "atoms": [
+    {
+      "id": "LIFE-01",
+      "name": "Canonical plan file; stateless reconstruction",
+      "statement": "All task contracts must live in one canonical file (.harness/plan.md), and every invocation must rebuild task state from canonical files only, never from session memory.",
+      "mechanism": "load_plan() parses root/.harness/plan.md on every command (re-read inside the ledger lock for mutations); as_dict()/plan_json() expose the parsed contract plus contract_hash.",
+      "threat": "Context reset or agent memory loss; divergent task definitions across sessions.",
+      "refs": [
+        "src/codex_harness/plan.py:252-253",
+        "src/codex_harness/plan.py:67-81",
+        "src/codex_harness/plan.py:468-474",
+        "src/codex_harness/cli.py:204-206"
+      ],
+      "tests": [
+        "tests/test_cli.py::test_plan_command_reads_registered_state",
+        "tests/test_optional_core_trim.py::test_fresh_process_continuation_uses_plan_report_and_session_start"
+      ],
+      "coupling": "host-neutral",
+      "loc": 25,
+      "g1_hint": "modify: keep one canonical contract store but hold it outside the agent's write reach (or treat any agent edit to it as untrusted input)."
+    },
+    {
+      "id": "LIFE-02",
+      "name": "Root selection: flag, env, upward search",
+      "statement": "The harness root is --root if given, else HARNESS_ROOT, else the nearest ancestor containing .harness/plan.md; otherwise root_not_found.",
+      "mechanism": "cli._root() resolves --root or calls util.find_root(), which honors the HARNESS_ROOT env var before walking parents.",
+      "threat": "Operating on the wrong repository's state.",
+      "refs": [
+        "src/codex_harness/cli.py:29-30",
+        "src/codex_harness/util.py:251-268"
+      ],
+      "tests": [],
+      "coupling": "host-neutral",
+      "loc": 20,
+      "g1_hint": "modify: pin the root from the omp session workspace; an env var the agent can set must not redirect the harness."
+    },
+    {
+      "id": "LIFE-03",
+      "name": "Strict plan header; empty plan valid",
+      "statement": "A plan that is missing, a symlink, unreadable, non-UTF-8, zero-byte, or lacks a '# [Name ]Harness Plan' first line is invalid (fail closed), while a valid header with no tasks is a legitimate zero-task state.",
+      "mechanism": "parse_plan() checks is_file/not symlink, decodes UTF-8, rejects empty text and fullmatches PLAN_HEADER on line 1 (invalid_plan); no TASK_HEADING lines returns tasks=().",
+      "threat": "Truncated/swapped plan silently read as 'no tasks'; symlink redirection of the canonical plan.",
+      "refs": [
+        "src/codex_harness/plan.py:21",
+        "src/codex_harness/plan.py:166-191"
+      ],
+      "tests": [
+        "tests/test_completion_boundary.py::test_zero_byte_and_missing_header_plans_are_invalid_but_template_is_valid",
+        "tests/test_plan.py::test_empty_plan_is_valid_and_has_no_current_task",
+        "tests/test_core_isolation.py::test_empty_plan_status_report_and_hooks_are_valid"
+      ],
+      "coupling": "host-neutral",
+      "loc": 26,
+      "g1_hint": "keep: fail-closed parsing that distinguishes corruption from 'no durable work'."
+    },
+    {
+      "id": "LIFE-04",
+      "name": "Task identity fields grammar",
+      "statement": "Each task starts at '## Task `id`' with a unique id matching [a-z0-9][a-z0-9._-]{0,63} and has exactly one non-empty 'Objective:' line and exactly one 'Status:' line in {pending, active, complete, blocked}.",
+      "mechanism": "TASK_HEADING delimits blocks (each runs to the next task heading); parse_plan counts Objective/Status lines anywhere in the block, validates STATUS_VALUES and rejects duplicate ids (invalid_plan); the ledger uses the same id grammar.",
+      "threat": "Ambiguous task identity, path injection through ids used in evidence paths, out-of-vocabulary status claims.",
+      "refs": [
+        "src/codex_harness/plan.py:20",
+        "src/codex_harness/plan.py:23",
+        "src/codex_harness/plan.py:185-209",
+        "src/codex_harness/plan.py:247-248",
+        "src/codex_harness/ledger.py:42"
+      ],
+      "tests": [],
+      "coupling": "host-neutral",
+      "loc": 24,
+      "g1_hint": "keep: strict id grammar matters because ids become filesystem paths."
+    },
+    {
+      "id": "LIFE-05",
+      "name": "Required contract sections, no duplicates",
+      "statement": "Every task must have Scope, Acceptance Criteria, Public Verify, Artifacts and When To Stop sections, each exactly once; extra ### sections are tolerated and not hashed.",
+      "mechanism": "_section_map() groups lines under '### ' headings (name stripped), raising invalid_plan for duplicates or missing required names.",
+      "threat": "Contracts lacking a verify command or artifact list; shadowing via duplicate sections.",
+      "refs": [
+        "src/codex_harness/plan.py:24-30",
+        "src/codex_harness/plan.py:124-144"
+      ],
+      "tests": [
+        "tests/test_plan.py::test_parser_rejects_missing_required_section"
+      ],
+      "coupling": "host-neutral",
+      "loc": 28,
+      "g1_hint": "keep: required fields; but prefer a structured format over markdown headings."
+    },
+    {
+      "id": "LIFE-06",
+      "name": "Section value extraction rules",
+      "statement": "Scope and Artifacts are the non-empty '- ' bullets (outer backticks trimmed); Public Verify and When To Stop are all non-blank lines joined by spaces with one surrounding backtick pair stripped; empty values are invalid.",
+      "mechanism": "_bullet_values() ignores non-bullet lines (so comments are invisible) and rejects empty bullets; _single_value() joins lines and strips outer backticks.",
+      "threat": "Empty/whitespace verify commands or artifact lists entering a contract.",
+      "refs": [
+        "src/codex_harness/plan.py:147-163",
+        "src/codex_harness/plan.py:211-214",
+        "src/codex_harness/plan.py:238-244"
+      ],
+      "tests": [
+        "tests/test_completion_boundary.py::test_two_intentionally_parked_tasks_and_plan_comments_remain_clean"
+      ],
+      "coupling": "host-neutral",
+      "loc": 20,
+      "g1_hint": "modify: replace markdown heuristics with a typed contract schema (JSON/TOML) so hashing is unambiguous."
+    },
+    {
+      "id": "LIFE-07",
+      "name": "Acceptance criteria are strict checkboxes",
+      "statement": "Every non-blank line under Acceptance Criteria must be '- [ ] text' or '- [x|X] text', and at least one criterion is required.",
+      "mechanism": "CRITERION regex per line; any mismatch or zero criteria raises invalid_plan; complete flag = mark in {x, X}.",
+      "threat": "Free-form or hidden criteria escaping the completion check.",
+      "refs": [
+        "src/codex_harness/plan.py:22",
+        "src/codex_harness/plan.py:215-231"
+      ],
+      "tests": [
+        "tests/test_plan.py::test_parse_plan_and_state_changes_preserve_contract_hash"
+      ],
+      "coupling": "host-neutral",
+      "loc": 18,
+      "g1_hint": "keep: strict criteria list; the checkbox state itself is a claim (see LIFE-18)."
+    },
+    {
+      "id": "LIFE-08",
+      "name": "Contract hash over immutable fields",
+      "statement": "contract_hash is sha256 of canonical JSON of task_id, objective, scope, criterion texts, public_verify, artifacts and when_to_stop, and must exclude status and check marks.",
+      "mechanism": "TaskContract.contract_hash hashes canonical_json (sorted keys, compact separators, no NaN); marking/status changes leave it stable.",
+      "threat": "Silent edits to goals, criteria, verify command or artifacts after evidence was produced.",
+      "refs": [
+        "src/codex_harness/plan.py:39-61",
+        "src/codex_harness/util.py:32-39"
+      ],
+      "tests": [
+        "tests/test_plan.py::test_parse_plan_and_state_changes_preserve_contract_hash"
+      ],
+      "coupling": "host-neutral",
+      "loc": 20,
+      "g1_hint": "keep: the anchor every receipt and transition binds to."
+    },
+    {
+      "id": "LIFE-09",
+      "name": "First-sight contract registration anchor",
+      "statement": "A non-terminal task's contract must be anchored in the ledger (contract_registered) before verification or any lifecycle mutation uses it.",
+      "mechanism": "_ensure_contract_locked() appends contract_registered{task_id, contract_hash} when no registration/update anchor exists; called by verify_task(), by every plan command's enrollment loop (even 'plan --json'), and by bootstrap.",
+      "threat": "Verifying or completing against an unanchored, still-editable contract.",
+      "refs": [
+        "src/codex_harness/plan.py:282-315",
+        "src/codex_harness/plan.py:340-356",
+        "src/codex_harness/cli.py:249-258",
+        "src/codex_harness/evidence.py:242"
+      ],
+      "tests": [
+        "tests/test_completion_boundary_remediation_2.py::test_completed_contract_drift_does_not_block_unrelated_task_mark",
+        "tests/test_optional_core_trim.py::test_concurrent_identical_invalidation_is_one_atomic_event"
+      ],
+      "coupling": "host-neutral",
+      "loc": 35,
+      "g1_hint": "modify: register only at explicit task creation; implicit enrollment makes display commands write state."
+    },
+    {
+      "id": "LIFE-10",
+      "name": "Contract drift is refused",
+      "statement": "If a non-terminal task's current hash differs from its latest anchor without an accepted update, verification and every plan mutation must fail with contract_drift; terminal tasks are skipped so their drift is reported, not blocking.",
+      "mechanism": "_ensure_contract_locked() compares the latest contract_registered/contract_update_accepted hash with the parsed hash; _cmd_plan checks all non-terminal tasks, verify_task checks its task; terminal tasks return early.",
+      "threat": "Agent weakens criteria, verify command or artifacts and then verifies/completes.",
+      "refs": [
+        "src/codex_harness/plan.py:291-322",
+        "src/codex_harness/cli.py:249-258",
+        "src/codex_harness/evidence.py:242"
+      ],
+      "tests": [
+        "tests/test_plan.py::test_contract_drift_requires_explicit_acceptance",
+        "tests/test_completion_boundary_remediation_2.py::test_completed_contract_drift_does_not_block_unrelated_task_mark"
+      ],
+      "coupling": "host-neutral",
+      "loc": 25,
+      "g1_hint": "keep: core anti-goalpost-moving rule."
+    },
+    {
+      "id": "LIFE-11",
+      "name": "Explicit accepted contract update with reason",
+      "statement": "A changed contract becomes authoritative only through an explicit accept command with a non-blank reason, recorded as contract_update_accepted{old_contract_hash, contract_hash, reason} with old != new.",
+      "mechanism": "plan --accept-contract-change <id> --reason calls _ensure_contract_locked(accept_change=True); the new anchor makes older receipts RECEIPT_CONTRACT_MISMATCH and stales any pending completion binding.",
+      "threat": "Silent drift; reusing evidence produced under a superseded contract.",
+      "refs": [
+        "src/codex_harness/plan.py:323-337",
+        "src/codex_harness/cli.py:239-248",
+        "src/codex_harness/ledger.py:872-890"
+      ],
+      "tests": [
+        "tests/test_plan.py::test_contract_drift_requires_explicit_acceptance",
+        "tests/test_security_core.py::test_previous_contract_receipt_is_stale",
+        "tests/test_completion_boundary_remediation.py::test_every_required_later_task_frontier_makes_completion_binding_stale"
+      ],
+      "coupling": "host-neutral",
+      "loc": 25,
+      "g1_hint": "modify: acceptance must come from the human channel, not an agent-invokable command; the agent's reason is a claim, not evidence."
+    },
+    {
+      "id": "LIFE-12",
+      "name": "Enrolled tasks cannot vanish from plan",
+      "statement": "Every task id ever registered in the ledger must remain in the plan; otherwise bootstrap is refused and the report cannot be complete.",
+      "mechanism": "plan_ledger_task_mismatch() diffs contract_registered ids against plan ids; begin_task raises plan_ledger_task_mismatch; build_report sets task_state/issue and complete=False.",
+      "threat": "Deleting an unfinished task from the plan to reach vacuous completion.",
+      "refs": [
+        "src/codex_harness/plan.py:108-121",
+        "src/codex_harness/plan.py:563-569",
+        "src/codex_harness/reporting.py:27-28",
+        "src/codex_harness/reporting.py:154-158"
+      ],
+      "tests": [
+        "tests/test_completion_boundary.py::test_plan_ledger_mismatch_is_reported_without_reconstruction"
+      ],
+      "coupling": "host-neutral",
+      "loc": 25,
+      "g1_hint": "keep: append-only task registry must dominate the editable plan view."
+    },
+    {
+      "id": "LIFE-13",
+      "name": "At most one active task",
+      "statement": "At most one task may be active: more than one is a typed ambiguity, and activating another task while one is active is refused.",
+      "mechanism": "current_task() raises current_task_ambiguous; validate_status_change() raises task_status_conflict; both run under the ledger lock so racing activations produce one winner and a zero-write loser.",
+      "threat": "Conflicting continuations; racing activations.",
+      "refs": [
+        "src/codex_harness/plan.py:96-105",
+        "src/codex_harness/plan.py:429-435"
+      ],
+      "tests": [
+        "tests/test_core_isolation.py::test_multiple_active_tasks_fail_with_typed_ambiguity",
+        "tests/test_completion_boundary_remediation.py::test_same_status_is_noop_and_different_active_task_conflicts_before_enrollment",
+        "tests/test_completion_boundary_remediation.py::test_concurrent_activations_have_one_typed_loser_and_one_transition",
+        "tests/test_completion_boundary_remediation_2.py::test_concurrent_activation_has_one_success_one_zero_write_typed_loser"
+      ],
+      "coupling": "host-neutral",
+      "loc": 17,
+      "g1_hint": "keep: one focus task per session simplifies evidence attribution."
+    },
+    {
+      "id": "LIFE-14",
+      "name": "Status vocabulary and transition routing",
+      "statement": "pending/active/blocked may change freely (subject to single-active), 'complete' is reachable only through the completion gate, and nothing leaves complete.",
+      "mechanism": "validate_status_change() checks vocabulary (invalid_status), terminality and single-active; _cmd_plan routes 'complete' to the evaluator path and other statuses to _set_status_locked + task_status_changed. No 'must be active' precondition exists for completion.",
+      "threat": "Agent declaring completion by editing status; reopening finished work.",
+      "refs": [
+        "src/codex_harness/plan.py:417-436",
+        "src/codex_harness/cli.py:269-293",
+        "src/codex_harness/cli.py:324-380"
+      ],
+      "tests": [
+        "tests/test_completion_boundary.py::test_legitimate_active_task_status_anchor_boundary_is_clean",
+        "tests/test_completion_boundary_remediation.py::test_completed_status_is_terminal_typed_and_zero_write"
+      ],
+      "coupling": "host-neutral",
+      "loc": 25,
+      "g1_hint": "modify: add an explicit state machine (e.g., only active -> complete)."
+    },
+    {
+      "id": "LIFE-15",
+      "name": "Terminal if plan OR ledger says complete",
+      "statement": "A task is terminal if the plan says complete or the ledger holds any complete transition for it; terminal tasks refuse status change, criterion marking and contract acceptance (task_reopen_refused).",
+      "mechanism": "_task_is_terminal() unions plan status with _authoritative_complete_transition(); used by _validate_mark_request, validate_status_change and _ensure_contract_locked(accept_change).",
+      "threat": "Reopening or amending completed work by editing the plan back to active.",
+      "refs": [
+        "src/codex_harness/plan.py:256-279",
+        "src/codex_harness/plan.py:364-365",
+        "src/codex_harness/plan.py:427-428"
+      ],
+      "tests": [
+        "tests/test_completion_boundary_remediation_2.py::test_ledger_complete_is_terminal_even_when_plan_still_active",
+        "tests/test_completion_boundary_remediation_2.py::test_completed_mark_and_mark_all_are_typed_and_exactly_zero_write",
+        "tests/test_completion_boundary_remediation_2.py::test_completed_contract_acceptance_is_terminal_and_zero_write"
+      ],
+      "coupling": "host-neutral",
+      "loc": 24,
+      "g1_hint": "keep: fail-closed union; new work requires a new task."
+    },
+    {
+      "id": "LIFE-16",
+      "name": "Ledger-level terminal enforcement",
+      "statement": "The ledger itself must refuse non-complete status changes, contract updates and verification starts for a task with a complete transition, independent of plan content.",
+      "mechanism": "Ledger._validate_terminal_mutation() (task_reopen_refused) and _validate_verification_start() (verification_refused_complete_task) run on full-read appends; verify_task also pre-checks plan status. This closes the race where verify passed the plan guard before completion committed.",
+      "threat": "Bypassing CLI checks via direct API/tampered plan; overwriting a completed task's evidence.",
+      "refs": [
+        "src/codex_harness/ledger.py:1974-2010",
+        "src/codex_harness/ledger.py:2070-2091",
+        "src/codex_harness/evidence.py:237-241"
+      ],
+      "tests": [
+        "tests/test_completion_boundary_remediation_2.py::test_raw_ledger_terminal_mutations_are_typed_and_zero_write",
+        "tests/test_completion_boundary_remediation.py::test_verify_that_passed_plan_guard_is_refused_before_evidence_overwrite",
+        "tests/test_completion_boundary.py::test_completed_task_verify_is_typed_no_write_and_active_verify_still_works",
+        "tests/test_completion_boundary_remediation_2.py::test_authoritative_completion_rejects_verify_independent_of_contract"
+      ],
+      "coupling": "host-neutral",
+      "loc": 40,
+      "g1_hint": "keep: enforce invariants at the single writer, not only at the CLI."
+    },
+    {
+      "id": "LIFE-17",
+      "name": "Plan-first status writes with ledger reconcile",
+      "statement": "Non-complete status changes write the plan then append task_status_changed; a retry whose plan already matches but whose ledger frontier differs appends once (status_reconciled), and an exact repeat is zero-write.",
+      "mechanism": "_set_status_locked() returns (task, changed); _recorded_status_frontier() derives the ledger status after the current contract anchor (registration implies 'active'); append when changed or frontier != requested.",
+      "threat": "Crash between plan write and ledger append leaving plan/ledger divergent; duplicate transitions on retry.",
+      "refs": [
+        "src/codex_harness/cli.py:68-97",
+        "src/codex_harness/cli.py:269-293",
+        "src/codex_harness/plan.py:439-465"
+      ],
+      "tests": [
+        "tests/test_ledger_canonicality.py::test_status_retry_reconciles_once_then_is_zero_write",
+        "tests/test_ledger_canonicality.py::test_status_retry_reconciles_empty_frontier_after_contract_update",
+        "tests/test_completion_boundary_remediation.py::test_same_status_is_noop_and_different_active_task_conflicts_before_enrollment"
+      ],
+      "coupling": "host-neutral",
+      "loc": 55,
+      "g1_hint": "modify: write the authoritative log first and derive the plan view from it; avoid frontier heuristics."
+    },
+    {
+      "id": "LIFE-18",
+      "name": "Criterion marking flips checkboxes in place",
+      "statement": "--mark N / --mark-all flip '- [ ]' to '- [x]' for 1-based criteria via an atomic plan rewrite; out-of-range numbers fail (invalid_criterion), repeats are zero-write, and no ledger event is recorded.",
+      "mechanism": "_validate_mark_request() checks terminality and range; _mark_criteria_locked() rescans the task's '### Acceptance Criteria' lines under the lock and rewrites only if changed.",
+      "threat": "Lost updates between concurrent marks; marking criteria of completed tasks.",
+      "refs": [
+        "src/codex_harness/plan.py:359-414",
+        "src/codex_harness/cli.py:212-217",
+        "src/codex_harness/cli.py:260-267"
+      ],
+      "tests": [
+        "tests/test_completion_boundary_remediation_2.py::test_concurrent_marks_preserve_both_and_repeated_mark_is_no_write",
+        "tests/test_completion_boundary_remediation_2.py::test_concurrent_mark_and_other_task_status_preserve_both_results",
+        "tests/test_plan.py::test_parse_plan_and_state_changes_preserve_contract_hash"
+      ],
+      "coupling": "host-neutral",
+      "loc": 70,
+      "g1_hint": "modify: checkmarks are agent self-attestation; bind each criterion to a harness-run check or record marks as claims only."
+    },
+    {
+      "id": "LIFE-19",
+      "name": "All criteria checked before completion",
+      "statement": "Completion (current and historical) requires a non-empty criteria list with every criterion checked.",
+      "mechanism": "TaskContract.all_criteria_complete; evaluate_completion() returns ACCEPTANCE_INCOMPLETE (CLI: completion_blocked 'unchecked criteria').",
+      "threat": "Completing with acknowledged-unfinished acceptance items.",
+      "refs": [
+        "src/codex_harness/plan.py:63-65",
+        "src/codex_harness/completion.py:267-271"
+      ],
+      "tests": [
+        "tests/test_cli.py::test_verify_report_and_completion_gate",
+        "tests/test_completion_boundary.py::test_completed_task_semantic_drift_is_a_global_integrity_issue"
+      ],
+      "coupling": "host-neutral",
+      "loc": 8,
+      "g1_hint": "modify: necessary but not sufficient, since marks are agent-written."
+    },
+    {
+      "id": "LIFE-20",
+      "name": "Bootstrap input validation",
+      "statement": "Task bootstrap requires a grammar-valid id, single-line bounded texts (4096 B; verify 8192 B), relative non-traversing scope/artifact paths, at least one scope/criterion/artifact, and no duplicate scopes or criteria.",
+      "mechanism": "begin_task() normalizes via _bootstrap_text() (no NUL/CR/LF) and validate_relative_path(); violations raise invalid_task_bootstrap or unsafe_path.",
+      "threat": "Newline injection into the markdown contract; absolute or '..' paths escaping the repository.",
+      "refs": [
+        "src/codex_harness/plan.py:477-490",
+        "src/codex_harness/plan.py:515-544",
+        "src/codex_harness/util.py:274-281"
+      ],
+      "tests": [
+        "tests/test_core_isolation.py::test_template_seeded_fresh_repository_lifecycle_completes"
+      ],
+      "coupling": "host-neutral",
+      "loc": 50,
+      "g1_hint": "keep: validate all agent-supplied contract text before it touches canonical state."
+    },
+    {
+      "id": "LIFE-21",
+      "name": "Artifacts must lie inside allowed scope",
+      "statement": "Every declared artifact path must equal or be beneath one of the task's allowed scope paths.",
+      "mechanism": "_path_in_scope() compares PurePosixPath candidates against scopes by equality or ancestry; violation raises invalid_task_bootstrap; enforced only at bootstrap.",
+      "threat": "Declaring evidence artifacts outside the task's mutation boundary.",
+      "refs": [
+        "src/codex_harness/plan.py:493-498",
+        "src/codex_harness/plan.py:545-549"
+      ],
+      "tests": [],
+      "coupling": "host-neutral",
+      "loc": 11,
+      "g1_hint": "keep: cheap consistency check; reject '.' as a scope."
+    },
+    {
+      "id": "LIFE-22",
+      "name": "Bootstrap preconditions re-checked under lock",
+      "statement": "A task may be bootstrapped only when plan and ledger agree, no task is active, and the id is unused, all evaluated inside the exclusive lock.",
+      "mechanism": "begin_task re-reads receipts and plan inside ledger._exclusive_lock and raises plan_ledger_task_mismatch or task_bootstrap_conflict; concurrent begins yield one winner and a zero-write loser.",
+      "threat": "Racing bootstraps creating two active tasks or duplicate ids.",
+      "refs": [
+        "src/codex_harness/plan.py:558-578"
+      ],
+      "tests": [
+        "tests/test_completion_boundary_remediation_2.py::test_concurrent_task_begin_adds_one_task_and_loser_is_zero_write"
+      ],
+      "coupling": "posix",
+      "loc": 20,
+      "g1_hint": "keep: concurrent bootstraps must have exactly one winner and a zero-write loser."
+    },
+    {
+      "id": "LIFE-23",
+      "name": "Atomic generated bootstrap with rollback",
+      "statement": "Bootstrap must write a machine-generated contract only after the full candidate plan re-parses with exactly one active task, then register it, restoring the original plan if registration fails.",
+      "mechanism": "Renders 'Allowed path' bullets, default Risk/Out-of-scope bullets, 'Status: active' and a fixed When To Stop sentence; parses the candidate in a temp dir; atomic_write_text(plan); _append_locked('contract_registered', {bootstrap: True, allowed_paths}); on Exception restores the original (else task_bootstrap_rollback_failed).",
+      "threat": "Plan containing a task the ledger never registered, or a corrupt plan, after a failed bootstrap.",
+      "refs": [
+        "src/codex_harness/plan.py:550-556",
+        "src/codex_harness/plan.py:579-645"
+      ],
+      "tests": [
+        "tests/test_ledger_canonicality.py::test_first_explicit_task_begin_creates_genesis_and_registration",
+        "tests/test_completion_boundary_remediation_2.py::test_concurrent_task_begin_adds_one_task_and_loser_is_zero_write"
+      ],
+      "coupling": "posix",
+      "loc": 95,
+      "g1_hint": "modify: log-first (or journaled) creation so process death cannot leave an unregistered task; generate from structured data."
+    },
+    {
+      "id": "LIFE-24",
+      "name": "Ledger genesis only by first bootstrap",
+      "statement": "A new ledger may be created only by the first task bootstrap from a provably pristine state; any other missing-ledger state fails closed.",
+      "mechanism": "begin_task passes allow_genesis=_canonical_pair_absent() to _append_locked; _bootstrap_locked creates ledger+head only then; _pristine_uninitialized raises ledger_state_missing if durable task traces exist.",
+      "threat": "Deleting the ledger to erase history and restart clean.",
+      "refs": [
+        "src/codex_harness/plan.py:561",
+        "src/codex_harness/plan.py:634",
+        "src/codex_harness/ledger.py:1382-1400",
+        "src/codex_harness/ledger.py:1743-1786"
+      ],
+      "tests": [
+        "tests/test_ledger_canonicality.py::test_first_explicit_task_begin_creates_genesis_and_registration",
+        "tests/test_ledger_canonicality.py::test_both_missing_with_durable_trace_fails_closed_zero_repair"
+      ],
+      "coupling": "host-neutral",
+      "loc": 15,
+      "g1_hint": "keep: history deletion must be detectable, never a fresh start."
+    },
+    {
+      "id": "LIFE-25",
+      "name": "Allowed paths recorded, never enforced",
+      "statement": "Scope/allowed paths are hashed into the contract and stored in the bootstrap receipt, but nothing checks repository mutations against them.",
+      "mechanism": "allowed_paths is schema-validated in contract_registered and rendered as Scope bullets; no code reads it after writing; only artifact-in-scope is checked at bootstrap.",
+      "threat": "limitation: agent edits outside its declared scope go undetected.",
+      "refs": [
+        "src/codex_harness/plan.py:580",
+        "src/codex_harness/plan.py:631",
+        "src/codex_harness/ledger.py:842-870"
+      ],
+      "tests": [],
+      "coupling": "host-neutral",
+      "loc": 3,
+      "g1_hint": "modify: G1 can enforce scope from recorded omp tool calls/diffs before allowing completion."
+    },
+    {
+      "id": "LIFE-26",
+      "name": "Explicit idempotent task invalidation",
+      "statement": "Any task's current contract can be explicitly invalidated with a non-blank single-line reason of at most 2048 bytes, recorded exactly once per (task, contract_hash).",
+      "mechanism": "'task invalidate' validates the reason, then under the ledger lock appends task_invalidated{contract_hash, reason} unless one already exists for that hash (already_invalidated, zero-write).",
+      "threat": "Duplicate or racy invalidations; multi-line injected reasons.",
+      "refs": [
+        "src/codex_harness/cli.py:403-454",
+        "src/codex_harness/ledger.py:935-956"
+      ],
+      "tests": [
+        "tests/test_core_isolation.py::test_task_invalidate_is_single_event_idempotent_and_task_scoped",
+        "tests/test_core_isolation.py::test_task_invalidate_rejects_invalid_reason_without_append",
+        "tests/test_optional_core_trim.py::test_concurrent_identical_invalidation_is_one_atomic_event",
+        "tests/test_completion_boundary.py::test_legacy_tamper_does_not_suppress_explicit_invalidation"
+      ],
+      "coupling": "host-neutral",
+      "loc": 52,
+      "g1_hint": "keep: an explicit kill switch for evidence later found wrong."
+    },
+    {
+      "id": "LIFE-27",
+      "name": "Invalidation permanent and retroactive",
+      "statement": "An invalidation of a contract hash must defeat completion for that contract forever, including an already-committed completion; recovery requires a new contract.",
+      "mechanism": "_task_invalidation() matches task_invalidated at any seq -> VERIFICATION_INVALIDATED in current and historical evaluation; it is not a terminal mutation so it is allowed post-completion; reports suggest change_contract.",
+      "threat": "Continuing to trust a completion later shown to be wrong.",
+      "refs": [
+        "src/codex_harness/completion.py:119-131",
+        "src/codex_harness/completion.py:261-266",
+        "src/codex_harness/reporting.py:84-92",
+        "src/codex_harness/ledger.py:1997-1998"
+      ],
+      "tests": [
+        "tests/test_completion_boundary_remediation.py::test_completion_first_then_invalidation_is_single_and_invalidates_history",
+        "tests/test_completion_boundary_remediation.py::test_invalidation_first_makes_completion_stale_and_repeat_is_idempotent",
+        "tests/test_core_isolation.py::test_task_invalidate_is_single_event_idempotent_and_task_scoped"
+      ],
+      "coupling": "host-neutral",
+      "loc": 20,
+      "g1_hint": "keep: retroactive invalidation is the only safe response to evidence later found wrong."
+    },
+    {
+      "id": "LIFE-28",
+      "name": "Completion only through explicit gate",
+      "statement": "A task becomes complete only via 'plan --task X --status complete', which evaluates current evidence and commits a receipt-bound transition before updating the plan.",
+      "mechanism": "_cmd_plan runs evaluate_completion(require_status=False, require_current=True), raises completion_blocked with the reason code on failure, then appends task_status_changed{complete, verification_receipt_seq, verification_receipt_hash} and sets plan status.",
+      "threat": "Agent claiming completion in text or by editing the plan without harness-validated evidence.",
+      "refs": [
+        "src/codex_harness/cli.py:324-380"
+      ],
+      "tests": [
+        "tests/test_cli.py::test_verify_report_and_completion_gate",
+        "tests/test_core_isolation.py::test_new_completion_transition_always_binds_receipt",
+        "tests/test_core_isolation.py::test_template_seeded_fresh_repository_lifecycle_completes"
+      ],
+      "coupling": "git",
+      "loc": 57,
+      "g1_hint": "keep: the single choke point; in G1 it should be triggered/checked by the harness, not merely invoked by the agent."
+    },
+    {
+      "id": "LIFE-29",
+      "name": "Plan completion claim is not authority",
+      "statement": "A plan 'Status: complete' without a matching ledger complete transition must never count as completion.",
+      "mechanism": "Historical evaluation requires a complete transition carrying the current contract hash (COMPLETION_TRANSITION_MISSING); the gate raises completion_binding_stale when the plan says complete but no committed transition exists.",
+      "threat": "Agent edits the plan status to complete.",
+      "refs": [
+        "src/codex_harness/completion.py:288-301",
+        "src/codex_harness/cli.py:233-237",
+        "src/codex_harness/cli.py:356-360"
+      ],
+      "tests": [],
+      "coupling": "host-neutral",
+      "loc": 20,
+      "g1_hint": "keep: status text is a claim; only harness-written transitions count."
+    },
+    {
+      "id": "LIFE-30",
+      "name": "Latest verification attempt must succeed",
+      "statement": "In current mode the newest verification event (started, succeeded or failed) for the task must be verification_succeeded.",
+      "mechanism": "evaluate_completion collects the task's verification events and selects the last; none -> VERIFICATION_RECEIPT_MISSING, non-success -> LATEST_VERIFICATION_NOT_SUCCESS (an in-flight or later failed attempt blocks).",
+      "threat": "Cherry-picking an older success after a later failure; completing during an in-flight re-verification.",
+      "refs": [
+        "src/codex_harness/completion.py:21-25",
+        "src/codex_harness/completion.py:273-283",
+        "src/codex_harness/completion.py:350-356"
+      ],
+      "tests": [
+        "tests/test_security_core.py::test_manifest_exit_code_one_to_zero_forgery_cannot_complete",
+        "tests/test_security_core.py::test_later_failure_or_explicit_invalidation_blocks_current",
+        "tests/test_security_core.py::test_verification_failed_only_never_completes"
+      ],
+      "coupling": "host-neutral",
+      "loc": 18,
+      "g1_hint": "keep: latest-attempt-wins prevents cherry-picking an old pass over a newer failure."
+    },
+    {
+      "id": "LIFE-31",
+      "name": "Receipt bound to contract, exit, command",
+      "statement": "The selected receipt must carry the current contract_hash, exit_code 0 and public_command_digest equal to sha256 of the plan's Public Verify text.",
+      "mechanism": "RECEIPT_CONTRACT_MISMATCH, RECEIPT_EXIT_NONZERO, PUBLIC_COMMAND_MISMATCH; public_command_digest() hashes the UTF-8 command, so 'verify --command' overrides can never complete.",
+      "threat": "Evidence from a weaker or different command, or from a superseded contract.",
+      "refs": [
+        "src/codex_harness/completion.py:358-373",
+        "src/codex_harness/evidence.py:81-82"
+      ],
+      "tests": [
+        "tests/test_security_core.py::test_previous_contract_receipt_is_stale"
+      ],
+      "coupling": "host-neutral",
+      "loc": 16,
+      "g1_hint": "keep: G1 should additionally record the exact argv it executed."
+    },
+    {
+      "id": "LIFE-32",
+      "name": "Task-local manifest path binding",
+      "statement": "The receipt's manifest must be exactly .harness/evidence/<task_id>/manifest.json.",
+      "mechanism": "expected_manifest derived from the task id; mismatch -> MANIFEST_PATH_MISMATCH (also a legacy-prefix filter).",
+      "threat": "Reusing another task's manifest or receipt.",
+      "refs": [
+        "src/codex_harness/completion.py:286",
+        "src/codex_harness/completion.py:377-380"
+      ],
+      "tests": [
+        "tests/test_security_core.py::test_cross_task_success_receipt_cannot_reuse_manifest"
+      ],
+      "coupling": "host-neutral",
+      "loc": 5,
+      "g1_hint": "keep: evidence location must be derived by the harness, not chosen by the receipt."
+    },
+    {
+      "id": "LIFE-33",
+      "name": "Authoritative receipt field completeness",
+      "statement": "Non-legacy success receipts must contain all 15 binding fields (task, attempt, contract, manifest, manifest hash, command digest, exit, source, tree, artifacts, verification time, schema, ledger id, prev/record hash).",
+      "mechanism": "_AUTHORITATIVE_RECEIPT_FIELDS minus receipt keys must be empty, else VERIFICATION_RECEIPT_INCOMPLETE; needed because the ledger schema leaves manifest_content_hash optional.",
+      "threat": "Partially bound receipts skipping a check by omission.",
+      "refs": [
+        "src/codex_harness/completion.py:26-42",
+        "src/codex_harness/completion.py:382-387",
+        "src/codex_harness/ledger.py:1036-1052"
+      ],
+      "tests": [],
+      "coupling": "host-neutral",
+      "loc": 23,
+      "g1_hint": "keep: make the receipt schema itself require every binding field."
+    },
+    {
+      "id": "LIFE-34",
+      "name": "Manifest content hash binding",
+      "statement": "The manifest file's current SHA-256 must equal the receipt's manifest_content_hash.",
+      "mechanism": "sha256_file() (no-follow, regular file) of the task-local manifest compared to the receipt; mismatch -> MANIFEST_CHANGED.",
+      "threat": "Rewriting the manifest after verification (exit, tree, timestamp forgery).",
+      "refs": [
+        "src/codex_harness/completion.py:443-451",
+        "src/codex_harness/util.py:50-58"
+      ],
+      "tests": [
+        "tests/test_completion_boundary.py::test_explicit_completion_remains_strict_after_manifest_rewrite",
+        "tests/test_security_core.py::test_manifest_self_report_forgery_invalidates_success"
+      ],
+      "coupling": "host-neutral",
+      "loc": 9,
+      "g1_hint": "keep: binds the manifest to the exact bytes the harness hashed at verification time."
+    },
+    {
+      "id": "LIFE-35",
+      "name": "Receipt-manifest cross-binding",
+      "statement": "Receipt attempt_id, verification_timestamp, source_digest, repository_tree_hash and artifact_hashes must equal the manifest's attempt_id, timestamp, source_digest, git_tree_hash and artifacts.",
+      "mechanism": "ATTEMPT_MISMATCH, TIMESTAMP_MISMATCH, SOURCE_BINDING_MISMATCH, TREE_BINDING_MISMATCH, ARTIFACT_BINDING_MISMATCH equality checks.",
+      "threat": "Pairing a receipt with a manifest from another attempt or snapshot.",
+      "refs": [
+        "src/codex_harness/completion.py:452-460",
+        "src/codex_harness/completion.py:492-502"
+      ],
+      "tests": [
+        "tests/test_security_core.py::test_manifest_self_report_forgery_invalidates_success"
+      ],
+      "coupling": "host-neutral",
+      "loc": 20,
+      "g1_hint": "keep: cheap redundancy that also catches receipt/manifest pairing mistakes."
+    },
+    {
+      "id": "LIFE-36",
+      "name": "60-second receipt append freshness",
+      "statement": "The success receipt's ledger append time must be no earlier than, and at most 60 s after, the recorded verification time.",
+      "mechanism": "Parses both ISO timestamps (TIMESTAMP_INVALID) and fails TIMESTAMP_STALE outside [0, 60] s; both are harness utc_now() values (post-command and append).",
+      "threat": "Hand-appending a success receipt long after the fact for an old manifest (replay/deferred forging).",
+      "refs": [
+        "src/codex_harness/completion.py:461-479",
+        "src/codex_harness/evidence.py:283",
+        "src/codex_harness/ledger.py:2104"
+      ],
+      "tests": [],
+      "coupling": "host-neutral",
+      "loc": 19,
+      "g1_hint": "modify: G1 emits both events itself; use a configurable bound measured from harness-observed command exit with monotonic time."
+    },
+    {
+      "id": "LIFE-37",
+      "name": "Current snapshot equals verified snapshot",
+      "statement": "At completion the repository source digest and Git tree hash must equal those in the success receipt and declared artifacts must re-hash identically.",
+      "mechanism": "load_completion_state(include_current=True) computes source_digest() and git_tree_hash() (SOURCE_CHANGED/TREE_CHANGED); validate_manifest(require_current_artifacts=True) re-hashes artifacts (ARTIFACT_CHANGED).",
+      "threat": "Editing code after a passing verification, then completing.",
+      "refs": [
+        "src/codex_harness/completion.py:83-112",
+        "src/codex_harness/completion.py:418-425",
+        "src/codex_harness/completion.py:480-491",
+        "src/codex_harness/evidence.py:586-592"
+      ],
+      "tests": [
+        "tests/test_security_core.py::test_source_mutation_after_success_invalidates_receipt"
+      ],
+      "coupling": "git",
+      "loc": 45,
+      "g1_hint": "keep: strongest evidence check; recompute in the harness process, never accept agent-reported hashes."
+    },
+    {
+      "id": "LIFE-38",
+      "name": "Command output digest binding",
+      "statement": "For schema-3 manifests the receipt's stdout/stderr SHA-256 must match the manifest and the 0600 output files must still hash to those digests.",
+      "mechanism": "OUTPUT_BINDING_MISMATCH in the evaluator; validate_manifest re-hashes command.stdout/stderr (COMMAND_OUTPUT_CHANGED plus symlink/hardlink/mode/type checks); sets evidence_mode output-digest-bound.",
+      "threat": "Tampering with recorded command output after verification.",
+      "refs": [
+        "src/codex_harness/completion.py:503-512",
+        "src/codex_harness/evidence.py:593-623"
+      ],
+      "tests": [
+        "tests/test_core_isolation.py::test_new_command_output_content_mutation_is_detected",
+        "tests/test_core_isolation.py::test_new_command_output_file_security_is_enforced"
+      ],
+      "coupling": "posix",
+      "loc": 40,
+      "g1_hint": "keep: command output is harness-observed evidence and must stay immutable after capture."
+    },
+    {
+      "id": "LIFE-39",
+      "name": "Manifest semantic validation delegated",
+      "statement": "The manifest must be a secure 0600 regular file with exact fields, supported schema, exit 0, no timeout, root workspace '.', and the current task's id, contract hash and command digest.",
+      "mechanism": "evaluate_completion calls validate_manifest(); its HarnessError codes are upper-cased into reason codes (INVALID_MANIFEST, UNSAFE_MODE, EVIDENCE_IO, CONTRACT_DRIFT, VERIFICATION_COMMAND_DRIFT, ...).",
+      "threat": "Malformed or forged manifest accepted as evidence.",
+      "refs": [
+        "src/codex_harness/completion.py:418-441",
+        "src/codex_harness/evidence.py:447-545"
+      ],
+      "tests": [
+        "tests/test_completion_boundary_remediation_2.py::test_legacy_manifest_tri_state_including_unreadable_boundary",
+        "tests/test_optional_core_trim.py::test_legacy_manifest_unsafe_and_io_boundaries_are_typed"
+      ],
+      "coupling": "posix",
+      "loc": 25,
+      "g1_hint": "keep: the manifest must be re-validated on every read, never trusted from a prior pass."
+    },
+    {
+      "id": "LIFE-40",
+      "name": "Receipt chain position re-check",
+      "statement": "The selected receipt must sit at its seq in the validated chain with ledger schema v2, the correct predecessor hash and the ledger's id.",
+      "mechanism": "_validate_receipt_chain() -> RECEIPT_SEQUENCE_INVALID / LEDGER_SCHEMA_MISMATCH / LEDGER_ANCHOR_MISMATCH / LEDGER_ID_MISMATCH; Ledger.read() already enforces the same per record.",
+      "threat": "Receipt spliced from another ledger or position.",
+      "refs": [
+        "src/codex_harness/completion.py:205-234",
+        "src/codex_harness/completion.py:374-376",
+        "src/codex_harness/ledger.py:1149-1199"
+      ],
+      "tests": [],
+      "coupling": "host-neutral",
+      "loc": 33,
+      "g1_hint": "drop: duplicate of full-chain validation on read; keep chain checks in one place."
+    },
+    {
+      "id": "LIFE-41",
+      "name": "Fail-closed completion state loading",
+      "statement": "Any ledger read error or current-snapshot error must make evaluation invalid with that error's code, and state computed for a different root is rejected.",
+      "mechanism": "load_completion_state() captures HarnessError into error_code (upper-cased); evaluate_completion fails COMPLETION_STATE_ROOT_MISMATCH or the captured code before other checks.",
+      "threat": "Evaluating against a corrupt/pending ledger or the wrong repository.",
+      "refs": [
+        "src/codex_harness/completion.py:73-112",
+        "src/codex_harness/completion.py:252-259"
+      ],
+      "tests": [],
+      "coupling": "host-neutral",
+      "loc": 37,
+      "g1_hint": "keep: any uncertainty about evaluation inputs must yield 'not complete'."
+    },
+    {
+      "id": "LIFE-42",
+      "name": "Completion transition must bind receipt",
+      "statement": "Every new complete transition must name verification_receipt_seq and verification_receipt_hash of a successful (exit 0) receipt for the same task and contract.",
+      "mechanism": "Ledger._new_completion_binding() demands both fields (completion_binding_required/invalid); _validate_completion_binding() checks seq/hash/event/exit/task/contract (completion_binding_mismatch); read-time schema requires a complete pair, only on 'complete', with seq < record seq.",
+      "threat": "Unbound or forged completion transitions; binding to a failed receipt.",
+      "refs": [
+        "src/codex_harness/ledger.py:1904-1954",
+        "src/codex_harness/ledger.py:892-933",
+        "src/codex_harness/cli.py:338-342",
+        "src/codex_harness/cli.py:366-378"
+      ],
+      "tests": [
+        "tests/test_completion_boundary.py::test_direct_unbound_and_partial_completion_appends_are_rejected_without_write",
+        "tests/test_completion_boundary.py::test_malformed_completion_binding_is_rejected",
+        "tests/test_completion_boundary.py::test_completion_binding_must_reference_same_task_and_contract",
+        "tests/test_completion_boundary.py::test_completion_binding_rejects_failed_receipt_and_noncomplete_needs_no_binding",
+        "tests/test_core_isolation.py::test_new_completion_transition_always_binds_receipt",
+        "tests/test_ledger_canonicality.py::test_completion_receipt_sequence_is_exact"
+      ],
+      "coupling": "host-neutral",
+      "loc": 90,
+      "g1_hint": "keep: completion is a pointer to harness-recorded evidence, never a free-standing flag."
+    },
+    {
+      "id": "LIFE-43",
+      "name": "Later same-task event stales binding",
+      "statement": "A completion binding must be refused if any lifecycle event for the same task (contract registration/update, invalidation, status change, verification start/success/failure) follows the bound receipt; other tasks' events do not stale it.",
+      "mechanism": "_validate_completion_binding() scans receipts[seq:] for same-task frontier events under the append lock -> completion_binding_stale.",
+      "threat": "Completing on a receipt superseded by a newer attempt, invalidation, contract or status change that raced with evaluation.",
+      "refs": [
+        "src/codex_harness/ledger.py:1955-1972"
+      ],
+      "tests": [
+        "tests/test_completion_boundary_remediation.py::test_every_required_later_task_frontier_makes_completion_binding_stale",
+        "tests/test_completion_boundary_remediation.py::test_other_task_frontier_does_not_stale_completion_binding",
+        "tests/test_completion_boundary_remediation.py::test_verification_started_first_makes_paused_completion_stale_and_zero_write",
+        "tests/test_ledger_canonicality.py::test_reconciled_status_frontier_prevents_verification_reuse"
+      ],
+      "coupling": "host-neutral",
+      "loc": 18,
+      "g1_hint": "keep: closes the evaluate-then-commit race at the single writer."
+    },
+    {
+      "id": "LIFE-44",
+      "name": "Two-phase completion re-checked under lock",
+      "statement": "Evaluation runs outside the lock; the commit happens in a fresh lock window that re-reads ledger and plan and re-checks committed binding, plan status and an unchanged contract hash before appending.",
+      "mechanism": "_cmd_plan stores evaluated_contract_hash, re-locks, calls _committed_completion(receipt_seq, receipt_hash), refuses if the plan says complete or the hash changed (completion_binding_stale), then appends with locked_receipts so the ledger re-validates the frontier.",
+      "threat": "Races between concurrent completers, verifiers, invalidators and contract editors.",
+      "refs": [
+        "src/codex_harness/cli.py:325-380"
+      ],
+      "tests": [
+        "tests/test_completion_boundary_remediation.py::test_duplicate_concurrent_completion_appends_exactly_one_transition",
+        "tests/test_completion_boundary_remediation.py::test_invalidation_first_makes_completion_stale_and_repeat_is_idempotent",
+        "tests/test_completion_boundary_remediation_2.py::test_duplicate_completion_after_append_is_one_transition_and_idempotent"
+      ],
+      "coupling": "posix",
+      "loc": 56,
+      "g1_hint": "modify: also re-validate the filesystem snapshot and criteria under the commit lock (T1 leaves a TOCTOU gap)."
+    },
+    {
+      "id": "LIFE-45",
+      "name": "Committed completion validated before reuse",
+      "statement": "An existing complete transition is honored only if it is the task's latest status event, matches the current contract, and binds a successful same-task/same-contract receipt equal to any requested binding.",
+      "mechanism": "_committed_completion() raises completion_binding_stale on any mismatch; legacy unbound transitions are honored only for plan-complete tasks with no requested binding.",
+      "threat": "Recovering or re-reporting completion for a drifted contract or substituted receipt.",
+      "refs": [
+        "src/codex_harness/cli.py:54-65",
+        "src/codex_harness/cli.py:100-149"
+      ],
+      "tests": [
+        "tests/test_completion_boundary_remediation_2.py::test_completion_recovery_with_different_contract_fails_closed_zero_write"
+      ],
+      "coupling": "host-neutral",
+      "loc": 60,
+      "g1_hint": "keep: recovery must re-prove the binding instead of trusting a prior transition."
+    },
+    {
+      "id": "LIFE-46",
+      "name": "Ledger-first commit, idempotent recovery",
+      "statement": "The ledger transition must be committed before the plan is updated, and any rerun of the same complete request converges to exactly one transition, reporting completion_recovered or completion_already_committed.",
+      "mechanism": "The early committed check in lock 1 short-circuits to _completion_result(), which sets plan status if needed and returns an idempotent result with transition_seq; ledger pending-journal recovery handles mid-append crashes.",
+      "threat": "Crashes at any point duplicating transitions or leaving plan and ledger permanently divergent.",
+      "refs": [
+        "src/codex_harness/cli.py:152-165",
+        "src/codex_harness/cli.py:219-232",
+        "src/codex_harness/cli.py:366-380"
+      ],
+      "tests": [
+        "tests/test_completion_boundary_remediation_2.py::test_h1_nine_process_kill_points_converge_exactly_once",
+        "tests/test_completion_boundary_remediation_2.py::test_committed_completion_crashes_recover_without_another_transition",
+        "tests/test_completion_boundary_remediation_2.py::test_same_complete_request_is_explicit_idempotent_and_zero_write"
+      ],
+      "coupling": "posix",
+      "loc": 30,
+      "g1_hint": "keep: authoritative record first, derived views reconciled idempotently."
+    },
+    {
+      "id": "LIFE-47",
+      "name": "Legacy completion compare-and-commit",
+      "statement": "Reconciling an unbound legacy completion requires a passing historical evaluation and an unchanged ledger (same length and tail hash) between snapshot and commit.",
+      "mechanism": "Lock 1 records (transition seq, len(receipts), tail record_hash); evaluation runs unlocked; lock 2 compares and re-validates the committed transition before _completion_result().",
+      "threat": "Ledger mutation during unlocked legacy validation.",
+      "refs": [
+        "src/codex_harness/cli.py:202",
+        "src/codex_harness/cli.py:219-228",
+        "src/codex_harness/cli.py:295-323"
+      ],
+      "tests": [
+        "tests/test_optional_core_trim.py::test_legacy_same_complete_is_idempotent_metadata_zero_write"
+      ],
+      "coupling": "host-neutral",
+      "loc": 35,
+      "g1_hint": "drop: no legacy ledgers in G1 (the whole-ledger CAS pattern is reusable)."
+    },
+    {
+      "id": "LIFE-48",
+      "name": "Historical evaluation of completed tasks",
+      "statement": "A completed task is judged historically: its latest complete transition for the current contract must explicitly bind a successful same-task receipt, with evidence intact but no current source/tree/artifact match required.",
+      "mechanism": "evaluate_completion(require_current=False) checks binding pair completeness/range/event/hash (COMPLETION_RECEIPT_MISMATCH, COMPLETION_TRANSITION_MISSING), then all non-current checks with validate_manifest(require_current_artifacts=False).",
+      "threat": "Conflating 'was valid when completed' with 'passes now'; substituting a later receipt.",
+      "refs": [
+        "src/codex_harness/completion.py:285-330",
+        "src/codex_harness/completion.py:418-425"
+      ],
+      "tests": [
+        "tests/test_completion_boundary.py::test_completed_task_semantic_drift_is_a_global_integrity_issue",
+        "tests/test_core_isolation.py::test_new_command_output_content_mutation_is_detected"
+      ],
+      "coupling": "host-neutral",
+      "loc": 46,
+      "g1_hint": "keep: separates 'was proven at completion' from 'passes now'."
+    },
+    {
+      "id": "LIFE-49",
+      "name": "Legacy-prefix binding with disclosed weakness",
+      "statement": "For legacy unbound transitions the receipt is the latest qualifying success strictly before the transition, and the verdict must disclose weaker evidence (legacy-manifest-unbound) and a manifest-rewrite tri-state (True/False/None).",
+      "mechanism": "_legacy_prefix_candidate() filters receipts[:transition_seq] (task, contract, exit 0, task-local manifest, command digest or legacy command); content-hash/attempt/time/output checks are skipped; historical_manifest_rewritten compares a 0600 regular manifest to the legacy hash, else None.",
+      "threat": "A post-completion success retroactively justifying completion; weak legacy evidence presented as strong.",
+      "refs": [
+        "src/codex_harness/completion.py:188-202",
+        "src/codex_harness/completion.py:331-349",
+        "src/codex_harness/completion.py:382-417",
+        "src/codex_harness/completion.py:427-440"
+      ],
+      "tests": [
+        "tests/test_core_isolation.py::test_legacy_binding_is_prefix_bounded_against_post_completion_success",
+        "tests/test_core_isolation.py::test_legacy_manifest_is_explicitly_manifest_unbound",
+        "tests/test_completion_boundary.py::test_legacy_manifest_mode_and_rewrite_warning_are_derived_without_append",
+        "tests/test_completion_boundary_remediation.py::test_legacy_manifest_rewrite_state_is_derived_tri_state_without_append",
+        "tests/test_completion_boundary_remediation_2.py::test_legacy_manifest_tri_state_including_unreadable_boundary",
+        "tests/test_optional_core_trim.py::test_legacy_manifest_unsafe_and_io_boundaries_are_typed"
+      ],
+      "coupling": "host-neutral",
+      "loc": 75,
+      "g1_hint": "drop: no legacy data; keep only the 'disclose evidence strength' field idea."
+    },
+    {
+      "id": "LIFE-50",
+      "name": "Reports are read-only, never re-snapshot",
+      "statement": "Reporting must write nothing and never compute current source/tree digests (no Git objects), relying only on recorded state.",
+      "mechanism": "build_report uses load_completion_state(include_current=False) and evaluate_completion(require_current=False); stale cached report files are ignored.",
+      "threat": "Read paths mutating state or the Git object store; trusting cached reports.",
+      "refs": [
+        "src/codex_harness/reporting.py:16-26",
+        "src/codex_harness/reporting.py:98-104"
+      ],
+      "tests": [
+        "tests/test_completion_boundary.py::test_doctor_and_report_never_call_source_or_tree_digest",
+        "tests/test_completion_boundary.py::test_read_only_surfaces_add_no_git_objects_or_repository_bytes",
+        "tests/test_completion_boundary.py::test_report_is_read_only_and_ignores_inert_old_report_artifact"
+      ],
+      "coupling": "host-neutral",
+      "loc": 13,
+      "g1_hint": "keep: observation surfaces must not perturb the evidence they report."
+    },
+    {
+      "id": "LIFE-51",
+      "name": "Historical vs current semantics explicit",
+      "statement": "Reports must label completed tasks as historical snapshots (not 'passes now') and the active task as a recorded-event projection that always needs explicit completion.",
+      "mechanism": "Per-task completion_kind (historical|parked|current), verification_scope (historical_snapshot|recorded_event_only), current_repository_verified=None, authoritative_current_check_performed=False, explicit_completion_required, plus a completion_semantics block.",
+      "threat": "Readers over-interpreting a report as current verification.",
+      "refs": [
+        "src/codex_harness/reporting.py:44-149",
+        "src/codex_harness/reporting.py:178-189"
+      ],
+      "tests": [
+        "tests/test_core_isolation.py::test_failed_and_successful_logical_session_e2e_histories_are_preserved",
+        "tests/test_completion_boundary.py::test_doctor_and_report_never_call_source_or_tree_digest"
+      ],
+      "coupling": "host-neutral",
+      "loc": 60,
+      "g1_hint": "keep: stops readers treating historical snapshots as current proof."
+    },
+    {
+      "id": "LIFE-52",
+      "name": "Active-task verification projection",
+      "statement": "The active task's state is projected only from ledger events after its current contract anchor (contract-unregistered, invalidated, missing, started, succeeded, failed, stale-contract) with a derived next_action.",
+      "mechanism": "latest_verification_state() anchors on the latest registration/update with the current hash; build_report maps state to finish_or_change_acceptance / complete_explicitly / change_contract / verify.",
+      "threat": "Pre-anchor results leaking into guidance; re-verifying just to answer 'where am I'.",
+      "refs": [
+        "src/codex_harness/completion.py:134-185",
+        "src/codex_harness/reporting.py:62-95"
+      ],
+      "tests": [
+        "tests/test_core_isolation.py::test_acceptance_complete_active_projection_verification_states"
+      ],
+      "coupling": "host-neutral",
+      "loc": 85,
+      "g1_hint": "modify: keep the projection but derive it with the same invalidation/drift rules as the gate."
+    },
+    {
+      "id": "LIFE-53",
+      "name": "Single global integrity-regression issue",
+      "statement": "Plan/ledger disagreement (missing/mismatched contract anchor for a non-active task, a ledger-complete task failing historical evaluation, or plan status differing from the latest ledger status) must raise one global issue that blocks overall completeness.",
+      "mechanism": "build_report tracks latest contract and status anchors per task and sets historical_integrity_regression; issues gets 'historical_task_integrity_regression' once.",
+      "threat": "Post-hoc plan tampering (unchecking criteria, editing objective, flipping status) going unnoticed.",
+      "refs": [
+        "src/codex_harness/reporting.py:29-41",
+        "src/codex_harness/reporting.py:59-61",
+        "src/codex_harness/reporting.py:111-125",
+        "src/codex_harness/reporting.py:151-152"
+      ],
+      "tests": [
+        "tests/test_completion_boundary.py::test_completed_task_semantic_drift_is_a_global_integrity_issue",
+        "tests/test_completion_boundary.py::test_blocked_task_contract_drift_is_a_global_integrity_issue",
+        "tests/test_completion_boundary.py::test_active_task_status_anchor_drift_is_a_global_integrity_issue",
+        "tests/test_completion_boundary.py::test_legitimate_active_task_status_anchor_boundary_is_clean",
+        "tests/test_completion_boundary.py::test_multiple_historical_integrity_regressions_emit_one_global_issue",
+        "tests/test_completion_boundary.py::test_two_intentionally_parked_tasks_and_plan_comments_remain_clean"
+      ],
+      "coupling": "host-neutral",
+      "loc": 32,
+      "g1_hint": "keep: tamper detection on the agent-writable view."
+    },
+    {
+      "id": "LIFE-54",
+      "name": "Overall completeness aggregation",
+      "statement": "The repository is complete only if every task report is complete, no issues exist and the ledger is readable; --require-complete maps incompleteness to exit 1.",
+      "mechanism": "build_report aggregates complete across tasks; zero tasks yields task_state no_t1_tasks and complete=True; _cmd_report returns 1 when not complete.",
+      "threat": "Partial or corrupted state reported as done.",
+      "refs": [
+        "src/codex_harness/reporting.py:154-169",
+        "src/codex_harness/cli.py:481-486"
+      ],
+      "tests": [
+        "tests/test_cli.py::test_verify_report_and_completion_gate",
+        "tests/test_security_core.py::test_completion_and_report_reject_the_same_forged_manifest",
+        "tests/test_core_isolation.py::test_empty_plan_status_report_and_hooks_are_valid"
+      ],
+      "coupling": "host-neutral",
+      "loc": 22,
+      "g1_hint": "modify: do not treat zero tasks as complete (vacuous truth)."
+    },
+    {
+      "id": "LIFE-55",
+      "name": "Typed verdicts and fail-closed exits",
+      "statement": "Evaluations return a typed verdict (valid, reason_code, receipt seq/hash, scope, binding, evidence mode) and CLI failures surface as ERROR[code] exit 2; unexpected exceptions fail closed as internal_error (2), interrupts exit 130, negative report/ledger states exit 1.",
+      "mechanism": "CompletionEvaluation + _failure() (success AUTHORITATIVE_VERIFICATION_VALID); HarnessError carries a stable code; main() wraps every handler; _cmd_ledger/_cmd_report map states to 1.",
+      "threat": "Ambiguous outcomes being treated as success by an orchestrator.",
+      "refs": [
+        "src/codex_harness/completion.py:45-70",
+        "src/codex_harness/completion.py:115-116",
+        "src/codex_harness/completion.py:515-537",
+        "src/codex_harness/util.py:16-21",
+        "src/codex_harness/cli.py:489-505",
+        "src/codex_harness/cli.py:584-600"
+      ],
+      "tests": [
+        "tests/test_completion_boundary.py::test_zero_byte_and_missing_header_plans_are_invalid_but_template_is_valid",
+        "tests/test_optional_core_trim.py::test_legacy_manifest_unsafe_and_io_boundaries_are_typed",
+        "tests/test_core_isolation.py::test_legacy_binding_is_prefix_bounded_against_post_completion_success"
+      ],
+      "coupling": "host-neutral",
+      "loc": 55,
+      "g1_hint": "keep: a harness that cannot decide must say no with a machine-readable reason."
+    },
+    {
+      "id": "LIFE-56",
+      "name": "Validate before write; refusals zero-write",
+      "statement": "All request validation (terminality, single-active, criterion range, committed completion) must happen before the first durable write so refusals leave .harness byte-identical.",
+      "mechanism": "_cmd_plan runs validate_status_change/_validate_mark_request/_committed_completion before enrollment, marking or status writes; tests compare inode/mode/mtime/hash snapshots.",
+      "threat": "Partial state from rejected commands.",
+      "refs": [
+        "src/codex_harness/cli.py:204-237"
+      ],
+      "tests": [
+        "tests/test_completion_boundary_remediation.py::test_completed_status_is_terminal_typed_and_zero_write",
+        "tests/test_completion_boundary_remediation_2.py::test_ledger_complete_is_terminal_even_when_plan_still_active",
+        "tests/test_completion_boundary_remediation_2.py::test_completion_recovery_with_different_contract_fails_closed_zero_write"
+      ],
+      "coupling": "host-neutral",
+      "loc": 34,
+      "g1_hint": "keep: rejected requests must leave no partial state."
+    },
+    {
+      "id": "LIFE-57",
+      "name": "Advisory exclusive lock serializes mutations",
+      "statement": "Every plan/ledger mutation and its preceding re-read must happen inside one exclusive lock on .harness/ledger.lock.",
+      "mechanism": "Ledger._exclusive_lock() (fcntl.flock LOCK_EX) wraps _cmd_plan, task begin/invalidate and ensure_contract; inside, receipts come from _read_locked and the plan is reloaded.",
+      "threat": "Lost updates between concurrent harness processes (marks, statuses, bootstraps, invalidations).",
+      "refs": [
+        "src/codex_harness/ledger.py:1419-1432",
+        "src/codex_harness/cli.py:204-205",
+        "src/codex_harness/cli.py:343-346",
+        "src/codex_harness/cli.py:417-419",
+        "src/codex_harness/plan.py:347-349",
+        "src/codex_harness/plan.py:559-562"
+      ],
+      "tests": [
+        "tests/test_completion_boundary_remediation_2.py::test_concurrent_marks_preserve_both_and_repeated_mark_is_no_write",
+        "tests/test_completion_boundary_remediation_2.py::test_concurrent_mark_and_other_task_status_preserve_both_results",
+        "tests/test_optional_core_trim.py::test_concurrent_identical_invalidation_is_one_atomic_event"
+      ],
+      "coupling": "posix",
+      "loc": 15,
+      "g1_hint": "modify: an advisory lock does not stop the agent's direct edits; G1 must own the store (single writer process)."
+    },
+    {
+      "id": "LIFE-58",
+      "name": "Atomic durable plan rewrites",
+      "statement": "Every plan mutation must be a whole-file replace via temp file, fsync, rename and directory fsync.",
+      "mechanism": "atomic_write_text() -> atomic_write() for marks, status, bootstrap and bootstrap rollback.",
+      "threat": "Torn or partial plan after a crash mid-write.",
+      "refs": [
+        "src/codex_harness/util.py:155-179",
+        "src/codex_harness/plan.py:413",
+        "src/codex_harness/plan.py:464",
+        "src/codex_harness/plan.py:623",
+        "src/codex_harness/plan.py:638"
+      ],
+      "tests": [
+        "tests/test_completion_boundary_remediation_2.py::test_h1_nine_process_kill_points_converge_exactly_once"
+      ],
+      "coupling": "posix",
+      "loc": 25,
+      "g1_hint": "keep: crash-safe whole-file replacement for any derived view."
+    },
+    {
+      "id": "LIFE-59",
+      "name": "Verification pinned to root workspace",
+      "statement": "Authoritative verification must run in the repository root; --workspace must resolve in-root without symlinks and equal the root.",
+      "mechanism": "_cmd_verify resolves --workspace via resolve_in_root(reject_symlinks); evidence._root_workspace() raises unsafe_workspace otherwise; manifests must record workspace '.'.",
+      "threat": "Verifying a scratch copy that differs from the code being completed.",
+      "refs": [
+        "src/codex_harness/cli.py:458-478",
+        "src/codex_harness/evidence.py:85-91",
+        "src/codex_harness/evidence.py:500-504"
+      ],
+      "tests": [
+        "tests/test_cli.py::test_verify_report_and_completion_gate"
+      ],
+      "coupling": "posix",
+      "loc": 20,
+      "g1_hint": "keep: evidence must come from the same tree that is being completed."
+    },
+    {
+      "id": "LIFE-60",
+      "name": "Minimal command surface and writer set",
+      "statement": "The lifecycle CLI exposes only doctor, plan, task begin|invalidate, verify, report, ledger status|verify|recover and hook, and production code writes only seven core event types.",
+      "mechanism": "build_parser() defines the subcommands; _CURRENT_EVENT_TYPES is the writer allowlist; tests AST-scan production writers and assert removed commands/events are absent.",
+      "threat": "Hidden side channels or retired writers mutating lifecycle state.",
+      "refs": [
+        "src/codex_harness/cli.py:515-581",
+        "src/codex_harness/ledger.py:46-56",
+        "src/codex_harness/ledger.py:2024-2029"
+      ],
+      "tests": [
+        "tests/test_cli.py::test_required_commands_are_exposed",
+        "tests/test_core_isolation.py::test_production_writer_set_is_minimal_and_removed_events_have_no_writer",
+        "tests/test_optional_core_trim.py::test_deleted_resume_migration_and_oracle_surfaces_are_absent"
+      ],
+      "coupling": "host-neutral",
+      "loc": 70,
+      "g1_hint": "keep: small closed event vocabulary; the 'hook' entry is Codex-specific and replaced by the omp extension."
+    }
+  ],
+  "findings": [
+    {
+      "kind": "bug",
+      "detail": "Criterion marking matches the section heading exactly ('### Acceptance Criteria') while the parser strips the heading name, so a heading with extra whitespace parses fine but --mark/--mark-all silently change nothing and the CLI exits 0 (the changed flag is ignored).",
+      "refs": [
+        "src/codex_harness/plan.py:129",
+        "src/codex_harness/plan.py:399",
+        "src/codex_harness/plan.py:411-412",
+        "src/codex_harness/cli.py:260-267"
+      ]
+    },
+    {
+      "kind": "inconsistency",
+      "detail": "_recorded_status_frontier assumes a contract_registered anchor implies 'active', but the plan enrollment loop also registers pending/blocked tasks; a no-op same-status request on such a task appends a spurious task_status_changed ('status_reconciled'), which also stales any pending completion binding.",
+      "refs": [
+        "src/codex_harness/cli.py:95-96",
+        "src/codex_harness/cli.py:250-258",
+        "src/codex_harness/cli.py:274-293"
+      ]
+    },
+    {
+      "kind": "inconsistency",
+      "detail": "Invalidation scope differs: the evaluator and the CLI idempotency check honor a task_invalidated for the current contract hash at any seq, but latest_verification_state only counts invalidations after the latest anchor; after a contract reverts A->B->A the projection says 'succeeded'/complete_explicitly while the gate fails VERIFICATION_INVALIDATED.",
+      "refs": [
+        "src/codex_harness/completion.py:119-131",
+        "src/codex_harness/completion.py:151-164",
+        "src/codex_harness/cli.py:420-429",
+        "src/codex_harness/reporting.py:84-92"
+      ]
+    },
+    {
+      "kind": "inconsistency",
+      "detail": "Report integrity rules are asymmetric: a non-active task merely not yet enrolled (no contract anchor) is labeled historical_task_integrity_regression, while an active task with a drifted contract is not flagged and is projected as 'contract-unregistered' with next_action 'verify' (verify then fails contract_drift).",
+      "refs": [
+        "src/codex_harness/reporting.py:60-61",
+        "src/codex_harness/reporting.py:111-125",
+        "src/codex_harness/completion.py:139-147",
+        "src/codex_harness/reporting.py:84-92"
+      ]
+    },
+    {
+      "kind": "inconsistency",
+      "detail": "Every plan invocation, including read-only display 'plan --json', writes contract registrations; the enrollment loop appends registrations for earlier tasks before a later task raises contract_drift, so this typed failure is not zero-write.",
+      "refs": [
+        "src/codex_harness/cli.py:249-258",
+        "src/codex_harness/plan.py:305-315"
+      ]
+    },
+    {
+      "kind": "limitation",
+      "detail": "The ledger writer is unauthenticated: record hashes contain no secret and Ledger.append accepts any well-formed verification_succeeded from any same-user process (tests forge one), and a whole valid chain plus head can be rewritten (helper convert_completed_ledger_to_legacy does so). The completion gate trusts any well-formed receipt, relying only on manifest/path/time cross-checks.",
+      "refs": [
+        "src/codex_harness/ledger.py:1129-1146",
+        "src/codex_harness/ledger.py:2196-2204",
+        "tests/helpers.py:104-167",
+        "tests/test_security_core.py:116-121"
+      ]
+    },
+    {
+      "kind": "limitation",
+      "detail": "Completion TOCTOU: source/tree/artifact checks run outside the lock and the commit lock re-checks only ledger frontier, plan status and contract hash; filesystem edits or criteria unchecked between evaluation and commit are not caught at commit time (check marks are excluded from contract_hash).",
+      "refs": [
+        "src/codex_harness/cli.py:325-337",
+        "src/codex_harness/cli.py:343-380"
+      ]
+    },
+    {
+      "kind": "limitation",
+      "detail": "The fixed 60 s freshness window starts after the command exits and spans record_manifest (git tree + source digest) plus _current_binding (both recomputed) plus lock wait, so large repos or slow storage (e.g., proot) can make every success TIMESTAMP_STALE; it also does not bound evidence age at completion time.",
+      "refs": [
+        "src/codex_harness/completion.py:472-479",
+        "src/codex_harness/evidence.py:283-324"
+      ]
+    },
+    {
+      "kind": "limitation",
+      "detail": "Scope is never enforced: parsed Scope values are prose (a bootstrap bullet parses as 'Allowed path: `x' with a dangling backtick because strip('`') is outer-only), ledger allowed_paths is write-only, and '.' passes validate_relative_path (empty parts) so a whole-repo scope is accepted.",
+      "refs": [
+        "src/codex_harness/plan.py:149",
+        "src/codex_harness/plan.py:580",
+        "src/codex_harness/plan.py:631",
+        "src/codex_harness/util.py:274-281"
+      ]
+    },
+    {
+      "kind": "inconsistency",
+      "detail": "Parser leniency depends on section: comments are invisible in bullet sections but hashed in Public Verify/When To Stop; Objective/Status lines and stray '##' headings inside a task region are absorbed into sections (a Status line under When To Stop makes status edits change contract_hash); extra ### sections are accepted unhashed.",
+      "refs": [
+        "src/codex_harness/plan.py:124-163",
+        "src/codex_harness/plan.py:194-198"
+      ]
+    },
+    {
+      "kind": "dead-code",
+      "detail": "Unreachable checks: RECEIPT_TASK_MISMATCH (all selection paths filter task_id); 'unsupported evidence schema' (validate_manifest admits only 2/3); _validate_receipt_chain duplicates Ledger.read chain validation; the None contract_hash match for task_invalidated (schema requires a hash); completion_receipt_missing after a valid evaluation; _set_status_locked unknown_task.",
+      "refs": [
+        "src/codex_harness/completion.py:358-359",
+        "src/codex_harness/completion.py:513-514",
+        "src/codex_harness/completion.py:205-234",
+        "src/codex_harness/completion.py:128",
+        "src/codex_harness/completion.py:157",
+        "src/codex_harness/ledger.py:836-840",
+        "src/codex_harness/cli.py:338-342",
+        "src/codex_harness/plan.py:462-463"
+      ]
+    },
+    {
+      "kind": "inconsistency",
+      "detail": "Completion has no 'must be active' precondition: verify and the gate accept pending/blocked tasks; When To Stop is hashed prose that nothing evaluates.",
+      "refs": [
+        "src/codex_harness/plan.py:417-436",
+        "src/codex_harness/evidence.py:237-242",
+        "src/codex_harness/plan.py:609"
+      ]
+    },
+    {
+      "kind": "inconsistency",
+      "detail": "Error codes and validation are asymmetric: a missing --task reports 'unknown_task'; a missing contract-update reason reports 'contract_drift'; update reasons are unbounded/multi-line while invalidation reasons are single-line <=2048 B; bootstrap dedupes scopes and criteria but not artifacts.",
+      "refs": [
+        "src/codex_harness/cli.py:193-198",
+        "src/codex_harness/plan.py:323-324",
+        "src/codex_harness/cli.py:404-415",
+        "src/codex_harness/plan.py:540"
+      ]
+    },
+    {
+      "kind": "limitation",
+      "detail": "Crash windows: bootstrap rollback catches only Exception, so process death or KeyboardInterrupt after the plan write leaves an unregistered active task (later self-enrolled without bootstrap/allowed_paths; mismatch detection only covers ledger->plan); non-complete status is plan-first, so a crash mid-activation shows a false integrity regression until retried.",
+      "refs": [
+        "src/codex_harness/plan.py:623-644",
+        "src/codex_harness/plan.py:108-121",
+        "src/codex_harness/cli.py:269-286",
+        "src/codex_harness/reporting.py:60-61"
+      ]
+    },
+    {
+      "kind": "limitation",
+      "detail": "Agent-controllable inputs: the canonical plan is agent-writable and the flock is advisory, so direct edits bypass validation (detected only later as drift/regression); a forged 'Status: complete' makes a task terminal (fail-closed lockout) without any ledger completion; HARNESS_ROOT can redirect the CLI root when --root is absent.",
+      "refs": [
+        "src/codex_harness/plan.py:269-272",
+        "src/codex_harness/cli.py:233-237",
+        "src/codex_harness/ledger.py:1419-1432",
+        "src/codex_harness/util.py:251-260"
+      ]
+    },
+    {
+      "kind": "limitation",
+      "detail": "Vacuous completeness: with zero tasks the report sets complete=True, so 'report --require-complete' passes on an empty plan.",
+      "refs": [
+        "src/codex_harness/reporting.py:159-169"
+      ]
+    }
+  ]
+}

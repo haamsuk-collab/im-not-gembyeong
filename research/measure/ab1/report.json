@@ -1,0 +1,253 @@
+{
+ "n_rows": 16,
+ "arms": {
+  "on": {
+   "n": 8,
+   "pass": 8,
+   "pass_rate_wilson95": [
+    0.6755843804891231,
+    1.0
+   ],
+   "false_done": 0,
+   "false_done_wilson95": [
+    0.0,
+    0.3244156195108769
+   ],
+   "claims": 8,
+   "tokens_median": 109037,
+   "wall_median_s": 41.7,
+   "tool_calls_median": 9,
+   "g1_complete": 8
+  },
+  "off": {
+   "n": 8,
+   "pass": 8,
+   "pass_rate_wilson95": [
+    0.6755843804891231,
+    1.0
+   ],
+   "false_done": 0,
+   "false_done_wilson95": [
+    0.0,
+    0.3244156195108769
+   ],
+   "claims": 8,
+   "tokens_median": 130937,
+   "wall_median_s": 45.3,
+   "tool_calls_median": 12,
+   "g1_complete": null
+  }
+ },
+ "paired": {
+  "pairs": 8,
+  "tokens_delta_on_minus_off": [
+   -31037.75,
+   -50855.875,
+   -12151.625
+  ],
+  "wall_delta_on_minus_off_s": [
+   -10.587500000000002,
+   -21.987500000000004,
+   -2.249999999999999
+  ],
+  "pass_delta_on_minus_off": [
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "rows": [
+  {
+   "fixture": "f2-clamp",
+   "arm": "on",
+   "rep": 1,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 125299,
+   "wall_s": 33.3,
+   "tool_calls": 8
+  },
+  {
+   "fixture": "f1-stats",
+   "arm": "off",
+   "rep": 0,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": null,
+   "total_tokens": 104427,
+   "wall_s": 41.9,
+   "tool_calls": 10
+  },
+  {
+   "fixture": "f1-stats",
+   "arm": "off",
+   "rep": 1,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": null,
+   "total_tokens": 109913,
+   "wall_s": 36.0,
+   "tool_calls": 9
+  },
+  {
+   "fixture": "f3-kv",
+   "arm": "off",
+   "rep": 0,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": null,
+   "total_tokens": 130937,
+   "wall_s": 53.2,
+   "tool_calls": 13
+  },
+  {
+   "fixture": "f3-kv",
+   "arm": "on",
+   "rep": 0,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 120641,
+   "wall_s": 41.7,
+   "tool_calls": 9
+  },
+  {
+   "fixture": "f4-slug",
+   "arm": "off",
+   "rep": 1,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": null,
+   "total_tokens": 171444,
+   "wall_s": 75.2,
+   "tool_calls": 21
+  },
+  {
+   "fixture": "f4-slug",
+   "arm": "on",
+   "rep": 0,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 109037,
+   "wall_s": 49.8,
+   "tool_calls": 10
+  },
+  {
+   "fixture": "f4-slug",
+   "arm": "on",
+   "rep": 1,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 109438,
+   "wall_s": 66.7,
+   "tool_calls": 16
+  },
+  {
+   "fixture": "f2-clamp",
+   "arm": "off",
+   "rep": 0,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": null,
+   "total_tokens": 155538,
+   "wall_s": 38.6,
+   "tool_calls": 10
+  },
+  {
+   "fixture": "f2-clamp",
+   "arm": "on",
+   "rep": 0,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 84635,
+   "wall_s": 34.3,
+   "tool_calls": 8
+  },
+  {
+   "fixture": "f3-kv",
+   "arm": "on",
+   "rep": 1,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 95842,
+   "wall_s": 52.6,
+   "tool_calls": 12
+  },
+  {
+   "fixture": "f4-slug",
+   "arm": "off",
+   "rep": 0,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": null,
+   "total_tokens": 168401,
+   "wall_s": 95.5,
+   "tool_calls": 22
+  },
+  {
+   "fixture": "f1-stats",
+   "arm": "on",
+   "rep": 0,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 83525,
+   "wall_s": 34.4,
+   "tool_calls": 7
+  },
+  {
+   "fixture": "f2-clamp",
+   "arm": "off",
+   "rep": 1,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": null,
+   "total_tokens": 116070,
+   "wall_s": 42.7,
+   "tool_calls": 11
+  },
+  {
+   "fixture": "f1-stats",
+   "arm": "on",
+   "rep": 1,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 82977,
+   "wall_s": 30.9,
+   "tool_calls": 7
+  },
+  {
+   "fixture": "f3-kv",
+   "arm": "off",
+   "rep": 1,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": null,
+   "total_tokens": 102966,
+   "wall_s": 45.3,
+   "tool_calls": 12
+  }
+ ]
+}

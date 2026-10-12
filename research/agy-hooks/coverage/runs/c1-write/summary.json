@@ -1,0 +1,74 @@
+{
+ "name": "c1-write",
+ "model": "gemini-3.8-flash-high",
+ "rc": 0,
+ "seconds": 14.7,
+ "events": [
+  {
+   "event": "SessionStart",
+   "cid": "07a4fa9b",
+   "step": null
+  },
+  {
+   "event": "PreInvocation",
+   "cid": "07a4fa9b",
+   "step": null
+  },
+  {
+   "event": "PreToolUse",
+   "cid": "07a4fa9b",
+   "step": 2,
+   "tool": "write_to_file",
+   "argKeys": [
+    "CodeContent",
+    "Description",
+    "Overwrite",
+    "TargetFile",
+    "toolAction",
+    "toolSummary"
+   ]
+  },
+  {
+   "event": "PostToolUse",
+   "cid": "07a4fa9b",
+   "step": 2,
+   "tool": "write_to_file",
+   "argKeys": [
+    "CodeContent",
+    "Description",
+    "Overwrite",
+    "TargetFile",
+    "toolAction",
+    "toolSummary"
+   ]
+  },
+  {
+   "event": "PostInvocation",
+   "cid": "07a4fa9b",
+   "step": null
+  },
+  {
+   "event": "PreInvocation",
+   "cid": "07a4fa9b",
+   "step": null
+  },
+  {
+   "event": "PostInvocation",
+   "cid": "07a4fa9b",
+   "step": null
+  },
+  {
+   "event": "Stop",
+   "cid": "07a4fa9b",
+   "step": null
+  }
+ ],
+ "conversationIds": [
+  "07a4fa9b-21e7-435b-85f4-057990947392"
+ ],
+ "files": [
+  "README.md",
+  "probe.txt"
+ ],
+ "response": ""
+}

@@ -1,0 +1,310 @@
+{
+ "n_rows": 20,
+ "arms": {
+  "on_facts": {
+   "n": 10,
+   "pass": 10,
+   "pass_rate_wilson95": [
+    0.7224598312333834,
+    1.0
+   ],
+   "false_done": 0,
+   "false_done_wilson95": [
+    0.0,
+    0.2775401687666166
+   ],
+   "claims": 10,
+   "tokens_median": 247599,
+   "wall_median_s": 163.0,
+   "tool_calls_median": 25,
+   "g1_complete": 10
+  },
+  "on": {
+   "n": 10,
+   "pass": 10,
+   "pass_rate_wilson95": [
+    0.7224598312333834,
+    1.0
+   ],
+   "false_done": 0,
+   "false_done_wilson95": [
+    0.0,
+    0.2775401687666166
+   ],
+   "claims": 10,
+   "tokens_median": 212384,
+   "wall_median_s": 155.1,
+   "tool_calls_median": 23,
+   "g1_complete": 10
+  }
+ },
+ "paired": {
+  "arms": [
+   "on_facts",
+   "on"
+  ],
+  "pairs": 10,
+  "tokens_delta_on_minus_off": [
+   11578.2,
+   -10831.1,
+   39127.2
+  ],
+  "wall_delta_on_minus_off_s": [
+   -4.389999999999996,
+   -19.889999999999993,
+   10.0
+  ],
+  "tool_calls_delta": [
+   2.4,
+   -0.9,
+   5.7
+  ],
+  "pass_delta_on_minus_off": [
+   0.0,
+   0.0,
+   0.0
+  ]
+ },
+ "rows": [
+  {
+   "fixture": "x4-sched",
+   "arm": "on_facts",
+   "rep": 1,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 301487,
+   "wall_s": 183.7,
+   "tool_calls": 44
+  },
+  {
+   "fixture": "x3-markdown",
+   "arm": "on_facts",
+   "rep": 1,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 253065,
+   "wall_s": 163.0,
+   "tool_calls": 20
+  },
+  {
+   "fixture": "x4-sched",
+   "arm": "on_facts",
+   "rep": 0,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 264771,
+   "wall_s": 171.8,
+   "tool_calls": 41
+  },
+  {
+   "fixture": "x1-json",
+   "arm": "on_facts",
+   "rep": 1,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 162449,
+   "wall_s": 120.5,
+   "tool_calls": 23
+  },
+  {
+   "fixture": "x5-wrap",
+   "arm": "on_facts",
+   "rep": 0,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 318040,
+   "wall_s": 195.9,
+   "tool_calls": 35
+  },
+  {
+   "fixture": "x3-markdown",
+   "arm": "on_facts",
+   "rep": 0,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 195135,
+   "wall_s": 141.8,
+   "tool_calls": 13
+  },
+  {
+   "fixture": "x3-markdown",
+   "arm": "on",
+   "rep": 0,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 181721,
+   "wall_s": 137.7,
+   "tool_calls": 9
+  },
+  {
+   "fixture": "x5-wrap",
+   "arm": "on",
+   "rep": 0,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 218318,
+   "wall_s": 186.0,
+   "tool_calls": 25
+  },
+  {
+   "fixture": "x4-sched",
+   "arm": "on",
+   "rep": 0,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 268589,
+   "wall_s": 150.0,
+   "tool_calls": 39
+  },
+  {
+   "fixture": "x1-json",
+   "arm": "on",
+   "rep": 1,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 160712,
+   "wall_s": 119.5,
+   "tool_calls": 23
+  },
+  {
+   "fixture": "x2-regex",
+   "arm": "on_facts",
+   "rep": 0,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 178384,
+   "wall_s": 129.1,
+   "tool_calls": 26
+  },
+  {
+   "fixture": "x2-regex",
+   "arm": "on",
+   "rep": 0,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 212384,
+   "wall_s": 172.4,
+   "tool_calls": 20
+  },
+  {
+   "fixture": "x1-json",
+   "arm": "on",
+   "rep": 0,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 171221,
+   "wall_s": 127.6,
+   "tool_calls": 16
+  },
+  {
+   "fixture": "x2-regex",
+   "arm": "on",
+   "rep": 1,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 177697,
+   "wall_s": 154.3,
+   "tool_calls": 14
+  },
+  {
+   "fixture": "x5-wrap",
+   "arm": "on_facts",
+   "rep": 1,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 176813,
+   "wall_s": 119.7,
+   "tool_calls": 22
+  },
+  {
+   "fixture": "x3-markdown",
+   "arm": "on",
+   "rep": 1,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 232123,
+   "wall_s": 166.5,
+   "tool_calls": 22
+  },
+  {
+   "fixture": "x1-json",
+   "arm": "on_facts",
+   "rep": 0,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 157022,
+   "wall_s": 98.9,
+   "tool_calls": 19
+  },
+  {
+   "fixture": "x4-sched",
+   "arm": "on",
+   "rep": 1,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 320527,
+   "wall_s": 190.7,
+   "tool_calls": 51
+  },
+  {
+   "fixture": "x2-regex",
+   "arm": "on_facts",
+   "rep": 1,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 247599,
+   "wall_s": 191.5,
+   "tool_calls": 25
+  },
+  {
+   "fixture": "x5-wrap",
+   "arm": "on",
+   "rep": 1,
+   "pass": true,
+   "claim": true,
+   "false_done": false,
+   "g1_complete": true,
+   "total_tokens": 195691,
+   "wall_s": 155.1,
+   "tool_calls": 25
+  }
+ ]
+}

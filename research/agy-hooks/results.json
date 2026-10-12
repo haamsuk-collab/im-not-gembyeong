@@ -1,0 +1,405 @@
+{
+  "agy_version": "1.3.3",
+  "model": "gemini-3.8-flash-low",
+  "date": "2026-10-11",
+  "runs": [
+    {
+      "run": "t0-baseline",
+      "mode": {},
+      "hook_counts": {
+        "PreInvocation": 2,
+        "PreToolUse": 1,
+        "PostToolUse": 1,
+        "PostInvocation": 2,
+        "Stop": 1
+      },
+      "workspace_files": [
+        "README.md",
+        "probe.txt"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "DONE",
+      "usage": {
+        "input_tokens": 25831,
+        "output_tokens": 327,
+        "thinking_tokens": 192,
+        "cache_read_tokens": 0,
+        "total_tokens": 26158
+      },
+      "conversation_id": "7407a041-c0bd-43ec-a449-32e32fea442e"
+    },
+    {
+      "run": "t1-badjson",
+      "mode": {
+        "PreToolUse": "badjson"
+      },
+      "hook_counts": {
+        "PreInvocation": 3,
+        "PreToolUse": 2,
+        "PostInvocation": 3,
+        "Stop": 1
+      },
+      "workspace_files": [
+        "README.md"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "I am unable to execute tool calls because a pre-tool hook (`jsonhook__g1-probe_PreToolUse_0_0`) is failing with:\n\n```\nfailed to unmarshal result from hook jsonhook__g1-probe_PreToolUse_0_0 via protojson: this is not json: proto: syntax error (line 1:1): invalid value this\n```\n\nThis hook intercepts tool invocations (such as `write_to_file` and `run_command`) and produces invalid non-JSON output, blocking tool execution.",
+      "usage": {
+        "input_tokens": 38768,
+        "output_tokens": 386,
+        "thinking_tokens": 0,
+        "cache_read_tokens": 0,
+        "total_tokens": 39154
+      },
+      "conversation_id": "a0ec19b2-193c-4be7-ba6e-a6ab02c935f5"
+    },
+    {
+      "run": "t1-deny",
+      "mode": {
+        "PreToolUse": "deny"
+      },
+      "hook_counts": {
+        "PreInvocation": 2,
+        "PreToolUse": 1,
+        "PostInvocation": 2,
+        "Stop": 1
+      },
+      "workspace_files": [
+        "README.md"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "The file-writing tool was blocked by a pre-tool hook: `tool call denied by pre-tool hook: G1 probe: this tool call is denied`. As a result, `probe.txt` could not be created.",
+      "usage": {
+        "input_tokens": 25568,
+        "output_tokens": 183,
+        "thinking_tokens": 0,
+        "cache_read_tokens": 0,
+        "total_tokens": 25751
+      },
+      "conversation_id": "f5d27057-c5b3-403d-a59b-f0227bbe990e"
+    },
+    {
+      "run": "t1-empty",
+      "mode": {
+        "PreToolUse": "empty"
+      },
+      "hook_counts": {
+        "PreInvocation": 2,
+        "PreToolUse": 1,
+        "PostToolUse": 1,
+        "PostInvocation": 2,
+        "Stop": 1
+      },
+      "workspace_files": [
+        "README.md",
+        "probe.txt"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "DONE",
+      "usage": {
+        "input_tokens": 25643,
+        "output_tokens": 137,
+        "thinking_tokens": 0,
+        "cache_read_tokens": 0,
+        "total_tokens": 25780
+      },
+      "conversation_id": "f4005147-f1e8-4cd3-ab78-3714eb15339d"
+    },
+    {
+      "run": "t1-exit2",
+      "mode": {
+        "PreToolUse": "exit2"
+      },
+      "hook_counts": {
+        "PreInvocation": 3,
+        "PreToolUse": 2,
+        "PostInvocation": 3,
+        "Stop": 1
+      },
+      "workspace_files": [
+        "README.md"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "DONE",
+      "usage": {
+        "input_tokens": 38755,
+        "output_tokens": 270,
+        "thinking_tokens": 0,
+        "cache_read_tokens": 0,
+        "total_tokens": 39025
+      },
+      "conversation_id": "b2201b87-85c2-4af8-9e32-1f92777d7009"
+    },
+    {
+      "run": "t1-timeout",
+      "mode": {
+        "PreToolUse": "timeout",
+        "sleep": 20
+      },
+      "hook_counts": {
+        "PreInvocation": 3,
+        "PreToolUse": 2,
+        "PostInvocation": 3,
+        "Stop": 1,
+        "PreToolUse-late-finish": 2
+      },
+      "workspace_files": [
+        "README.md"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "I attempted to use the file-writing tool to create `probe.txt`, but execution was blocked by an external pre-tool hook (`jsonhook__g1-probe_PreToolUse_0_0`), which timed out and was killed:\n\n```\nEncountered error in tool execution: JSON hook \"jsonhook__g1-probe_PreToolUse_0_0\" failed: command failed: signal: killed\n```",
+      "usage": {
+        "input_tokens": 30577,
+        "output_tokens": 359,
+        "thinking_tokens": 0,
+        "cache_read_tokens": 8135,
+        "total_tokens": 30936
+      },
+      "conversation_id": "9de914fc-93f1-40eb-b3cc-8df4315359d7"
+    },
+    {
+      "run": "t10-preinv-crash",
+      "mode": {
+        "PreInvocation": "exit2"
+      },
+      "hook_counts": {
+        "SessionStart": 1,
+        "PreInvocation": 2,
+        "PreToolUse": 1,
+        "PostToolUse": 1,
+        "PostInvocation": 2,
+        "Stop": 1
+      },
+      "workspace_files": [
+        "README.md",
+        "probe.txt"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "DONE",
+      "usage": {
+        "input_tokens": 17526,
+        "output_tokens": 140,
+        "thinking_tokens": 0,
+        "cache_read_tokens": 8130,
+        "total_tokens": 17666
+      },
+      "conversation_id": "ceb388e4-d8e9-4b55-8952-3c023197319c"
+    },
+    {
+      "run": "t2-inject",
+      "mode": {
+        "PreInvocation": "inject",
+        "inject": "G1-PROBE-CODE: 9db193a9"
+      },
+      "hook_counts": {
+        "PreInvocation": 1,
+        "PostInvocation": 1,
+        "Stop": 1
+      },
+      "workspace_files": [
+        "README.md"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "9db193a9",
+      "usage": {
+        "input_tokens": 4557,
+        "output_tokens": 7,
+        "thinking_tokens": 0,
+        "cache_read_tokens": 8136,
+        "total_tokens": 4564
+      },
+      "conversation_id": "b1f96268-3914-45aa-89c0-2aaf24c532d9"
+    },
+    {
+      "run": "t3-stop-cap",
+      "mode": {
+        "stop_continue_limit": 20,
+        "stop_reason": "Not finished. Reply again with the single word AGAIN."
+      },
+      "hook_counts": {
+        "PreInvocation": 11,
+        "PostInvocation": 11,
+        "Stop": 11
+      },
+      "workspace_files": [
+        "README.md"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "OK\nAGAIN\nAGAIN\nAGAIN\nAGAIN\nAGAIN\nAGAIN\nAGAIN\nAGAIN\nAGAIN\nAGAIN",
+      "usage": {
+        "input_tokens": 118358,
+        "output_tokens": 21,
+        "thinking_tokens": 0,
+        "cache_read_tokens": 24313,
+        "total_tokens": 118379
+      },
+      "conversation_id": "be74738f-79e9-405d-81f9-f17a1113ea28"
+    },
+    {
+      "run": "t3-stop-once",
+      "mode": {
+        "stop_continue_limit": 1,
+        "stop_reason": "Before you stop, reply again and include the exact token STOPHOOK-7Q."
+      },
+      "hook_counts": {
+        "PreInvocation": 2,
+        "PostInvocation": 2,
+        "Stop": 2
+      },
+      "workspace_files": [
+        "README.md"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "OK\nSTOPHOOK-7Q",
+      "usage": {
+        "input_tokens": 25386,
+        "output_tokens": 6,
+        "thinking_tokens": 0,
+        "cache_read_tokens": 0,
+        "total_tokens": 25392
+      },
+      "conversation_id": "4982fa25-e24f-4133-9097-88c6457b83d4"
+    },
+    {
+      "run": "t5-overwrite",
+      "mode": {
+        "PreToolUse": "overwrite",
+        "overwrite": {
+          "CodeContent": "REWRITTEN-BY-G1"
+        },
+        "SessionStart": "inject",
+        "session_inject": "G1-SESSION-CODE: s7k2"
+      },
+      "hook_counts": {
+        "SessionStart": 1,
+        "PreInvocation": 2,
+        "PreToolUse": 1,
+        "PostToolUse": 1,
+        "PostInvocation": 2,
+        "Stop": 1
+      },
+      "workspace_files": [
+        "README.md",
+        "probe.txt"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "DONE",
+      "usage": {
+        "input_tokens": 17541,
+        "output_tokens": 135,
+        "thinking_tokens": 0,
+        "cache_read_tokens": 8136,
+        "total_tokens": 17676
+      },
+      "conversation_id": "36b2c910-3c47-4d0a-a8ad-6496daa92473"
+    },
+    {
+      "run": "t6-terminate",
+      "mode": {
+        "PostInvocation": "terminate_after:0"
+      },
+      "hook_counts": {
+        "SessionStart": 1,
+        "PreInvocation": 1,
+        "PreToolUse": 3,
+        "PostToolUse": 3,
+        "PostInvocation": 1,
+        "Stop": 1
+      },
+      "workspace_files": [
+        "README.md",
+        "a.txt",
+        "b.txt",
+        "c.txt"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "",
+      "usage": {
+        "input_tokens": 12676,
+        "output_tokens": 947,
+        "thinking_tokens": 545,
+        "cache_read_tokens": 0,
+        "total_tokens": 13623
+      },
+      "conversation_id": "08bbb9b9-659e-4b5a-a30c-49a2b897bc41"
+    },
+    {
+      "run": "t7-session-inject",
+      "mode": {
+        "SessionStart": "inject",
+        "session_inject": "G1-SESSION-CODE: s7k2"
+      },
+      "hook_counts": {
+        "SessionStart": 1,
+        "PreInvocation": 1,
+        "PostInvocation": 1,
+        "Stop": 1
+      },
+      "workspace_files": [
+        "README.md"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "s7k2",
+      "usage": {
+        "input_tokens": 4558,
+        "output_tokens": 77,
+        "thinking_tokens": 73,
+        "cache_read_tokens": 8136,
+        "total_tokens": 4635
+      },
+      "conversation_id": "61429548-4dca-476a-8f62-126a0ed92148"
+    },
+    {
+      "run": "t8-tamper",
+      "mode": {},
+      "hook_counts": {
+        "SessionStart": 1,
+        "PreInvocation": 3,
+        "PreToolUse": 2,
+        "PostToolUse": 2,
+        "PostInvocation": 3,
+        "Stop": 1
+      },
+      "workspace_files": [
+        "README.md",
+        "probe.txt"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "DONE",
+      "usage": {
+        "input_tokens": 31519,
+        "output_tokens": 623,
+        "thinking_tokens": 346,
+        "cache_read_tokens": 8132,
+        "total_tokens": 32142
+      },
+      "conversation_id": "fe40a3da-72b7-4b4e-bdfb-25e063ee8328"
+    },
+    {
+      "run": "t9-stop-timeout",
+      "mode": {
+        "Stop": "timeout",
+        "sleep": 10
+      },
+      "hook_counts": {
+        "SessionStart": 1,
+        "PreInvocation": 1,
+        "PostInvocation": 1,
+        "Stop": 1
+      },
+      "workspace_files": [
+        "README.md"
+      ],
+      "agy_status": "SUCCESS",
+      "agy_response": "OK",
+      "usage": {
+        "input_tokens": 12649,
+        "output_tokens": 1,
+        "thinking_tokens": 0,
+        "cache_read_tokens": 0,
+        "total_tokens": 12650
+      },
+      "conversation_id": "2eab59be-ec3f-479c-ac2a-aafe4d3c5c44"
+    }
+  ]
+}

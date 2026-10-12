@@ -1,0 +1,1207 @@
+{
+  "repo": "jaredpalmer/kev",
+  "commit": "2ecafc49fe1e8945cd600443e6c04c1cf0b3a78f",
+  "what_it_is": "Kev is an open, self-hostable reconstruction of TypeSafe's hosted 'Jev' decision model: a Qwen3.5/Qwen3.8 backbone run prefill-only with a rank-16 LoRA (full weights for 27B) and a pointer head that scores each caller-supplied option against a final <decide> token, so it returns a calibrated probability distribution and never generates text. A decision is one 'state' (text or JSON rendered to text, up to 65,536 tokens) plus any number of typed questions answered in isolated rows: noul (yes/no, returns p(yes)), choice (1-255 named options) or score (ordered levels, returns the expected level); labels are the option name, a boolean or a level index. Training is plain cross-entropy with no reinforcement learning or reward model, on public classification datasets with native labels, code-labelled synthetic policy and rule generators (one-fact minimal pairs with ablation checks, rule trees with certificates, hard-v1 solvers), open-weight-teacher-labelled CFPB complaints and developer-tooling sources, with option-order, none-of-the-above and missing-evidence augmentation, followed by one fitted temperature. It is served by a local FastAPI System One endpoint (bf16, prefix cache, CUDA graphs on NVIDIA, MLX on Apple Silicon); CPU runs a reference DeltaNet path with no latency measured on ARM Linux, and released sizes run from 0.8B (about 1.5 GB of weights) to 27B (51 GB). Evaluation is a rigorous statistics harness (hash-frozen suites, locked tests read once, pre-registered rules on paired record-clustered bootstrap bounds, ECE/Brier, coverage at an error budget, unknowable and isolation probes), but on the G1-relevant evaluation-only tasks the phone-sized model is near or below chance (Kev-0.8B prompt injection 0.547, When2Call 0.133), so its value to G1 is the measurement methodology, not a runtime veto judge.",
+  "architecture": [
+    "API contract: TypeSafe System One request/response types, noul/choice/score mapped to pointer options, confidence formulas, deterministic date facts (kev/api.py)",
+    "Model: encoder with unforgeable delimiters, block-causal mask or per-question rows, PointerHead carrying the temperature, serving admission (kev/model.py)",
+    "Checkpoint loader: head.pt Meta, LoRA-vs-full loader rule, LoadOptions from KEV_* env, warm start with compatibility checks (kev/checkpoint.py)",
+    "Serving: FastAPI /v1/systemone plus /permute, /separate and /v1/models, single model thread batching, state-prefix LRU cache, optional bearer key (kev/serve.py)",
+    "Backends and kernels: MLX for Apple Silicon (kev/mlx_model.py), fused Triton Qwen3.5 layers (kev/fused_qwen35.py), CUDA graphs (kev/cuda_graphs.py), child-process device probe (kev/device.py)",
+    "Data: public dataset converters, trainable/eval-only source policy, permutation, none-of-the-above, distractor and none-pair augmentation (kev/data.py)",
+    "Generators: contrastive minimal pairs (kev/contrastive.py), compositional rule trees with certificates (kev/composition.py), hard-v1 families with solvers (scripts/hard_v1_*.py), devtools/documents/breadth/longdoc builders (scripts/build_*.py), v3/v9 suite builders (kev/study_v3.py, kev/transfer_v9.py)",
+    "Frozen suites: per-partition sha256 manifests, locked test, Hub mirror fetch, removed-suite registry (kev/suite.py, evals/*/manifest.json)",
+    "Training: LoRA or full-weight trainer with CE plus optional KL/RPS/smoothing/Brier/focal losses, frozen-base anchors, resume points and snapshots (kev/train.py, kev/full_ft.py, kev/shared_prefix.py, kev/anchors.py)",
+    "Metrics: ECE/Brier/NLL, selective prediction (coverage at error, AURC, thresholds), temperature fit, out-of-fold CV, paired cluster bootstrap, per-length calibration (kev/metrics.py)",
+    "Benchmark and predictors: rows/report writer with coverage accounting, Local/Remote/Jev predictors, rotation averaging, kernel environment, workload calibration and comparisons (kev/benchmark.py, kev/predictors.py, kev/calibrate.py, kev/compare.py, kev/jev.py, kev/evaluate.py)",
+    "Research engine: config-only trials with gates and provenance (kev/experiment.py), registered rounds with CI-bound criteria (kev/rounds.py, experiments/rounds/*.json), spend-capped unattended sessions (kev/autoresearch.py, kev/budget.py)",
+    "GPU orchestration on Modal: trials, locked-test reader, attempt leases, release staging and verification (modal_app.py)",
+    "Release and claims: Hub publish and private mirror (kev/publish.py, kev/mirror.py), claims-to-report verifier (scripts/verify_claims.py, docs/claims.json), model cards and release notes (docs/model-cards/, docs/releases/)",
+    "User-facing agent skills: kev-finetune stdlib scripts plus Modal app, kev-deploy one-file Modal endpoint (skills/)",
+    "Agent operating documents: AGENTS.md, PLAN.md, docs/autoresearch.md, repo skills (.agents/skills/*), pinned third-party skills (skills-lock.json)",
+    "Demos and tools: Next.js playground with chess demo (playground/), Gradio Hugging Face Space (space/), keyboard label-review page (tools/review/)",
+    "Tests and CI: unit, research, rounds, conventions, device, generator, suite and skill-script tests (tests/), CI workflow (.github/workflows/ci.yml)",
+    "Data and results (listed, not read): evals/** JSONL partitions (~131 MB; e.g. evals/devtools-v1/train.jsonl 8.9 MB, evals/round5/longstate-v2/development.jsonl 7.9 MB, evals/v3/decision-v3/train.jsonl 5.5 MB), runs/** (~689 MB of rows.json/report.json/logs; e.g. runs/longdoc-v1-kev-27b/rows.json 4.1 MB), docs/*.png figures; no model weights or checkpoints in the clone (weights live on the Hugging Face Hub)"
+  ],
+  "atoms": [
+    {
+      "id": "KEV-01",
+      "name": "Typed probability-only decision API",
+      "statement": "A decision is one state text plus named typed questions, and the model may only return a probability distribution over options the caller supplied, never free text.",
+      "mechanism": "Pydantic Noul/Choice/Score types (1-255 options) become pointer options in to_record; to_answers returns p(yes), argmax plus distribution plus confidence, or expected level plus distribution (kev/api.py:17-46, kev/api.py:102-117, kev/api.py:149-160). The confidence fields are TypeSafe formulas and explicitly not accuracy rates (README.md:282).",
+      "refs": [
+        "kev/api.py:17",
+        "kev/api.py:102",
+        "kev/api.py:149",
+        "README.md:282"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "research",
+      "principle_fit": [
+        "Z4",
+        "P7"
+      ],
+      "principle_conflict": [
+        "Z1: the answer is still an AI judgment over untrusted text",
+        "P8: a probability proves no fact by itself"
+      ],
+      "proof_purpose": "none (a closed output space limits what a judge can say but proves nothing)",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "If G1 ever consults a model judge in the measurement layer, restrict it to closed typed questions with fixed option keys so its output cannot carry instructions, and log answers only as measurement rows.",
+      "cost": "medium"
+    },
+    {
+      "id": "KEV-02",
+      "name": "Small local judge as hook-time veto",
+      "statement": "Running the only phone-plausible size, Kev-0.8B, inside PreToolUse or Stop to flag risky commands or false completions is not supported by the repository's own evidence.",
+      "mechanism": "Kev-0.8B scores 0.547 on balanced prompt-injection detection and 0.167/0.133 on When2Call tool routing (below chance), with out-of-domain coverage at <=5% error of 0.145 (docs/model-cards/kev-0.8b.md:252-253, :278, :282); Kev-4B reaches 0.753/0.660 but carries ~8.4 GB of bf16 weights (docs/model-cards/kev-4b.md:247, :262). Off CUDA and MLX the Qwen3.5 DeltaNet layers run reference PyTorch code (kev/mlx_model.py:4), and the only CPU latencies in the repo are a Mac arm64 Qwen2.5-0.5B smoke run (median 120 ms, p95 717 ms; runs/smoke-hl/00-trial-0/result.json:410-412); nothing is measured on Linux aarch64 or Android.",
+      "refs": [
+        "docs/model-cards/kev-0.8b.md:252",
+        "docs/model-cards/kev-0.8b.md:278",
+        "docs/model-cards/kev-0.8b.md:282",
+        "docs/model-cards/kev-4b.md:247",
+        "kev/mlx_model.py:4",
+        "runs/smoke-hl/00-trial-0/result.json:410"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "duplicate-of:vesperchant 3-tier hooks (Stop audit with a fast judge model)",
+      "verdict": "reject",
+      "principle_fit": [
+        "TW"
+      ],
+      "principle_conflict": [
+        "P8: G1 already holds deterministic evidence (its own deny decisions and receipts), so a probabilistic flag proves no unique fact",
+        "Z1/Z3: the judge reads untrusted transcript text and its injection detection is near chance at 0.8B",
+        "P6: PreToolUse is fail-closed, so a slow, cold-loading or crashed model daemon blocks native tool calls",
+        "P2: a resident multi-GB inference daemon competes with the native agent on the phone"
+      ],
+      "proof_purpose": "none",
+      "hook_mapping": "PreToolUse",
+      "g1_design": "n/a: keep every PreToolUse and Stop decision deterministic; see KEV-03 for the only plausible (offline) variant.",
+      "cost": "high"
+    },
+    {
+      "id": "KEV-03",
+      "name": "Offline veto-only triage classifier for audits",
+      "statement": "A Kev model fine-tuned on G1's own receipt-derived labels could, off the hook path, rank archived sessions for extra deterministic re-audits without ever certifying or suppressing anything.",
+      "mechanism": "kev.train --init_from warm-starts the released LoRA and pointer head on user JSONL with replay of the base corpus; a temperature is refit on a held-out calibration slice and thresholds come from coverage at an error budget (README.md:198-212; skills/kev-finetune/SKILL.md:88-116; kev/metrics.py:149-164). Training needs a CUDA GPU (Modal H100 in the skill), not the phone (skills/kev-finetune/SKILL.md:5); missing-evidence records can be trained toward uniform soft targets (kev/data.py:404-409).",
+      "refs": [
+        "README.md:198",
+        "skills/kev-finetune/SKILL.md:5",
+        "skills/kev-finetune/SKILL.md:88",
+        "kev/metrics.py:149",
+        "kev/data.py:404"
+      ],
+      "evidence_quality": "untested",
+      "novelty": "new",
+      "verdict": "research",
+      "principle_fit": [
+        "PH",
+        "TW",
+        "Z7"
+      ],
+      "principle_conflict": [
+        "P7: needs a model and a cloud GPU training path, so it can only live in an adapter outside core semantics",
+        "P8: justified only if deterministic re-audits are too expensive to run on every session",
+        "P6: labels must come from G1 receipts, not from human labelling"
+      ],
+      "proof_purpose": "none; at most it orders an offline re-audit queue",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Derive labels only from G1 receipts (DONE claimed with vs without a receipt, including withheld-evidence twins), train off-device, confirm on a locked holdout, and use the score solely to order an offline deterministic re-audit queue; it never grants, denies or suppresses.",
+      "cost": "high"
+    },
+    {
+      "id": "KEV-04",
+      "name": "Paired cluster bootstrap with full recomputation",
+      "statement": "Every comparison is a candidate-minus-reference delta on the same items, with a 95% percentile interval from resampling whole record groups within each source and recomputing nonlinear statistics in every draw.",
+      "mechanism": "cluster_resamples draws (source, group) clusters with replacement inside each source (kev/metrics.py:308-314); paired_bootstrap refuses duplicate or mismatched pairs and recomputes coverage, AURC and ECE per resample (kev/metrics.py:372-426); rounds fix 2,000 resamples, seed 0, micro aggregation (kev/rounds.py:98, kev/rounds.py:109-112).",
+      "refs": [
+        "kev/metrics.py:308",
+        "kev/metrics.py:372",
+        "kev/rounds.py:109",
+        "tests/test_research.py:331",
+        "tests/test_research.py:347"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adopt",
+      "principle_fit": [
+        "Z7",
+        "P8"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that the difference between two injected-rule variants, or two agy versions, on the same task fixtures has a 95% interval excluding zero",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Run each fixture under both arms, store per-fixture outcome vectors, and compute the paired delta CI by resampling fixtures (all repeats of a fixture move together); write the CI into the measurement receipt, never into the authority path.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-05",
+      "name": "Pre-registered CI-bound rule with tri-state verdict",
+      "statement": "A study's panels, primary criteria (lower bound above zero), guard criteria (non-inferiority margins on upper bounds) and ranking are committed as JSON before any run, and the verdict is computed mechanically as pass, fail or incomplete.",
+      "mechanism": "compare() computes every panel's paired deltas, _criterion() returns None when a value is missing, and passed stays None unless all reads exist (kev/rounds.py:830-875, kev/rounds.py:902-907); r27.json registers primaries like primary.acc.lower > 0 and guards like short.brier.upper <= 0.02 (experiments/rounds/r27.json:210-248); the spec's commit time is the registration time (PLAN.md:279-281).",
+      "refs": [
+        "kev/rounds.py:3",
+        "kev/rounds.py:830",
+        "kev/rounds.py:902",
+        "experiments/rounds/r27.json:210",
+        "PLAN.md:279",
+        "tests/test_rounds.py:581",
+        "tests/test_rounds.py:793"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adopt",
+      "principle_fit": [
+        "P8",
+        "Z6",
+        "Z7"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that a measurement verdict (adopt an injected rule, accept a host fact) follows a rule fixed and hashed before any outcome was seen",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Store each measurement spec (arms, fixtures, primary and guard criteria on CI bounds, rank) as a hashed record in G1 state before running; compute pass/fail/incomplete mechanically, with any missing read yielding incomplete.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-06",
+      "name": "Spec validation: every criterion has computed evidence",
+      "statement": "A registered spec is refused if a criterion or rank path names an unknown panel or metric, if a report-only panel is read by a criterion, or if a panel computes nothing.",
+      "mechanism": "validate() checks read tags, panel contents, optional panels that gate, and every criterion path (kev/rounds.py:362-438, kev/rounds.py:413-417); _known_path allows interval bounds only on bootstrapped metrics (kev/rounds.py:441-447).",
+      "refs": [
+        "kev/rounds.py:362",
+        "kev/rounds.py:413",
+        "kev/rounds.py:441",
+        "tests/test_rounds.py:898"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adopt",
+      "principle_fit": [
+        "P8",
+        "P4"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that every acceptance criterion of a task contract or measurement spec maps to at least one computed check (no zero row in the coverage matrix)",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "At contract or spec registration, require every criterion to reference an existing deterministic check id and forbid report-only checks from gating; refuse the contract otherwise (G1's zero-row rule).",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-07",
+      "name": "Locked holdout read once, enforced in code",
+      "statement": "Test partitions need an explicit flag, a locked read for a named candidate is refused a second time, and an interrupted read is completed only by an explicit, recorded request.",
+      "mechanism": "load_split raises unless allow_test (kev/suite.py:208-209); run_locked_test refuses when every suite is already summarised, demands redo_interrupted for touched-but-unsummarised suites, and forces an '-ungated' name when gates failed (modal_app.py:181-212); once read, a panel is selection or regression evidence only (PLAN.md:283-285).",
+      "refs": [
+        "kev/suite.py:208",
+        "modal_app.py:196",
+        "modal_app.py:204",
+        "modal_app.py:212",
+        "PLAN.md:283",
+        "tests/test_research.py:106",
+        "tests/test_research.py:193"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adapt",
+      "principle_fit": [
+        "Z6",
+        "Z7"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that a confirmation result for a rule or injection variant comes from fixtures never used to select it",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Keep a hash-pinned holdout fixture set; the measurement runner records each (candidate, holdout) read in the ledger, refuses a second read, and labels reads of gate-failing candidates as exploratory.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-08",
+      "name": "Retire unsound instruments; past verdicts stand",
+      "statement": "A benchmark found unsound as a gate is deleted and listed with its reason, date and last round, every later read is refused, and verdicts already computed from it remain the record.",
+      "mechanism": "REMOVED_SUITES entries (kev/suite.py:49-85) are enforced by refuse_removed in load_split and read_manifest (kev/suite.py:104-107); rounds.validate archives reads up to last_round and refuses later ones (kev/rounds.py:380-386); policy in PLAN.md:306-311.",
+      "refs": [
+        "kev/suite.py:49",
+        "kev/suite.py:104",
+        "kev/rounds.py:380",
+        "PLAN.md:306",
+        "tests/test_rounds.py:47",
+        "tests/test_rounds.py:83"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adopt",
+      "principle_fit": [
+        "P3",
+        "Z7"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that no current G1 measurement depends on a probe already shown to be noise or mislabelled",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Maintain a retired-probe list in G1 state (probe id, reason, date, last measurement that used it); the runner refuses retired probes while historical receipts keep their results.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-09",
+      "name": "Size guards to resolution; audit reliability",
+      "statement": "A guard is meaningful only if the suite can resolve its threshold, so small panels are pooled and an instrument whose scores show near-zero split-half correlation across many checkpoints is removed.",
+      "mechanism": "PLAN learned #12: on 656 questions the accuracy interval is about +/-1.7 pp and seed variance about +/-1-2 pp, so one-point leads are noise (PLAN.md:248-254); WANLI-v2 and TypeSafe were removed after split-half r of 0.04 and -0.01 across checkpoints (kev/suite.py:62-66, kev/suite.py:78-82). The split-half computation itself is not in this checkout.",
+      "refs": [
+        "PLAN.md:248",
+        "kev/suite.py:62",
+        "kev/suite.py:78"
+      ],
+      "evidence_quality": "claimed-only",
+      "novelty": "new",
+      "verdict": "adapt",
+      "principle_fit": [
+        "Z7",
+        "P8"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that a host-contract re-test or A/B probe can actually distinguish the effect size it gates on",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Before a probe gates anything, repeat it on unchanged G1 and agy versions, compute split-half agreement and interval width, and gate only on pooled probes whose width is below the registered margin.",
+      "cost": "medium"
+    },
+    {
+      "id": "KEV-10",
+      "name": "McNemar paired sample-size planning",
+      "statement": "The number of paired items needed to detect a given change at a target power is computed before generating data, and after a run the observed interval says whether more volume could ever make the effect significant.",
+      "mechanism": "paired_questions implements n = (z_a*sqrt(p_d) + z_b*sqrt(p_d - g^2))^2 / g^2 with p_d = gain + 2 x regressions (skills/kev-finetune/scripts/plan_size.py:25-33); from_result rescales the observed standard error and refuses to chase near-zero deltas or ones needing >10x data (skills/kev-finetune/scripts/plan_size.py:48-66).",
+      "refs": [
+        "skills/kev-finetune/scripts/plan_size.py:25",
+        "skills/kev-finetune/scripts/plan_size.py:48",
+        "tests/test_skill_scripts.py:183"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adopt",
+      "principle_fit": [
+        "Z7",
+        "P8"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that a planned agy re-test batch is large enough to detect the registered change (for example a drop from the measured 3-of-8 false-completion rate)",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Before each host-contract or A/B measurement, compute the paired session count from baseline discordance and the minimum effect; refuse underpowered batches and record the plan in the measurement spec.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-11",
+      "name": "Withheld-evidence twins scored on confident answers",
+      "statement": "Records whose deciding evidence was removed are scored not on accuracy but on how often the model still answers with >=0.9 confidence, paired against intact control twins.",
+      "mechanism": "unknowable_report computes mean max-p, the share at >=0.9 and the paired confidence drop against control_id twins (kev/metrics.py:167-180); unknowable rows never enter accuracy denominators (kev/metrics.py:264-266, kev/benchmark.py:87); README reports Kev-9B 0% vs Jev 9% (README.md:383).",
+      "refs": [
+        "kev/metrics.py:167",
+        "kev/metrics.py:264",
+        "kev/benchmark.py:87",
+        "README.md:383",
+        "tests/test_research.py:377"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adapt",
+      "principle_fit": [
+        "PH",
+        "P4",
+        "Z5"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "the rate at which the agent claims completion when G1 withheld or blocked the verifying evidence, versus the intact twin task",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Build twin fixtures (intact vs the same task with the verifying tool call denied by G1) and measure the share of DONE claims on the withheld twin with a paired interval; use it as the primary metric for Stop-hook and injection A/B tests.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-12",
+      "name": "Present/absent option pairs expose shortcuts",
+      "statement": "The same question is asked with a 'none of these' option once with the true option present and once with it removed, so a model that ignores the evidence answers the same way in both.",
+      "mechanism": "none_pair builds the minimal pair with identical option order (kev/data.py:346-359); contrast_cases freezes none_present and none_absent variants into suites (kev/suite.py:253-283); gate_report requires neither variant to regress (kev/experiment.py:194-195); evaluate.test_none_of_the_above measures it (kev/evaluate.py:84-106).",
+      "refs": [
+        "kev/data.py:346",
+        "kev/suite.py:253",
+        "kev/experiment.py:194",
+        "kev/evaluate.py:84",
+        "tests/test_research.py:34",
+        "tests/test_research.py:754"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adapt",
+      "principle_fit": [
+        "PH",
+        "Z5",
+        "Z7"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that an injected rule makes the agent report 'blocked / cannot verify' when, and only when, the completion path is actually missing",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Pair fixtures where a completion path exists vs is removed (required file absent, tool denied); the expected outcome differs only by that fact; count paired errors in A/B tests.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-13",
+      "name": "Code-labelled minimal pairs with ablation checks",
+      "statement": "Generated items are kept only if changing exactly one sentence flips a code-computed label, removing any evidence sentence makes the label undetermined, and removing any filler leaves it unchanged.",
+      "mechanism": "check_pair enforces these conditions (kev/contrastive.py:229-244); generate retries and records rejection reasons per family (kev/contrastive.py:258-278); paired_flip reports flip and both-correct rates, since a model that ignores the state cannot flip (kev/contrastive.py:281-306).",
+      "refs": [
+        "kev/contrastive.py:1",
+        "kev/contrastive.py:229",
+        "kev/contrastive.py:258",
+        "kev/contrastive.py:281",
+        "tests/test_research.py:230",
+        "tests/test_generators.py:10"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adopt",
+      "principle_fit": [
+        "P4",
+        "P8",
+        "Z7"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that each G1 deterministic check reacts to exactly the fact it claims to prove (flips on the deciding fact, invariant to filler)",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Generate workspace-state pairs differing in one fact (a failing test, a missing artifact, a stale tree hash) and assert in G1's own CI that the gate flips exactly on the deciding fact and ignores filler edits.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-14",
+      "name": "Certificate-carrying fixtures re-derived before use",
+      "statement": "Each generated record carries its rule tree, atoms, facts and label, and a checker recomputes the label from the certificate and verifies that a pair changes exactly one fact.",
+      "mechanism": "generate attaches certificate {tree, atoms, facts, order, deciding_field, label} (kev/composition.py:246-295); check_group recomputes label and rendered text, checks the one-fact intervention, and requires the deciding-field ablation to give UNKNOWN (kev/composition.py:298-321); evaluate_rule is three-valued (kev/composition.py:48-65).",
+      "refs": [
+        "kev/composition.py:48",
+        "kev/composition.py:246",
+        "kev/composition.py:298",
+        "tests/test_generators.py:30",
+        "tests/test_generators.py:51"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adapt",
+      "principle_fit": [
+        "P4",
+        "Z7"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that every measurement fixture's expected outcome is reproducible from its own stored certificate, not from a human or model label",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Store with each fixture a certificate (setup commands, expected check vector, deciding fact) and re-derive the expected vector before every run; refuse fixtures whose certificate does not reproduce.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-15",
+      "name": "Planted single-error items for mutation testing",
+      "statement": "A proposed answer is either exactly right or carries one plausible planted error from a per-task catalogue, with the label computed by an exact solver.",
+      "mechanism": "gen_judge computes the truth with Fractions, builds a catalogue of named mistakes (discount order, fencepost, inverted conversion...), drops mistakes equal to the truth and plants one at random (scripts/hard_v1_numeric.py:490-597); solve_judge labels by exact comparison (scripts/hard_v1_numeric.py:482-488); _judge_item renders six surface templates (scripts/hard_v1_numeric.py:600-614).",
+      "refs": [
+        "scripts/hard_v1_numeric.py:482",
+        "scripts/hard_v1_numeric.py:490",
+        "scripts/hard_v1_numeric.py:584",
+        "scripts/hard_v1_numeric.py:600",
+        "tests/test_hard_v1.py:48"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adopt",
+      "principle_fit": [
+        "P4",
+        "P5",
+        "Z7"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that G1's completion gate rejects any receipt or claim carrying a single planted defect (wrong digest, stale tree hash, missing artifact, wrong test count)",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Mutation-test the authority path: from a valid receipt generate one-defect variants from a named defect catalogue and require the completion gate to reject every variant while accepting the original.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-16",
+      "name": "Held-out templates and canonical structures",
+      "statement": "Generalisation is measured on surface templates and rule structures never used in training, with structures deduplicated under commutativity and De Morgan normalisation.",
+      "mechanism": "hard-v1 uses templates 0-3 for train, 4 for development and 5 for test (evals/hard-v1/manifest.json:72); composition splits SHAPES and excludes random trees whose canonical or negation-pushed key matches a held-out shape (kev/composition.py:24-26, kev/composition.py:124-164, kev/composition.py:177-192); validate_training refuses held-out structures (kev/suite.py:190-194).",
+      "refs": [
+        "evals/hard-v1/manifest.json:72",
+        "kev/composition.py:124",
+        "kev/composition.py:164",
+        "kev/suite.py:194",
+        "tests/test_generators.py:89",
+        "tests/test_hard_v1.py:72"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adapt",
+      "principle_fit": [
+        "Z7",
+        "P8"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that an injected rule's measured benefit holds on task wordings and structures not used while writing it",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Split A/B fixtures by template and task structure; author injected rules against development templates only and report effects on held-out templates.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-17",
+      "name": "Execution fingerprint recorded with every read",
+      "statement": "Every report records package versions, device, dtype and the kernel implementations the outputs depend on, and reads are paired bit-for-bit only within one fingerprint.",
+      "mechanism": "kernel_environment collects packages, GPU, dtype, attention implementation and bound DeltaNet kernels (kev/predictors.py:67-90); benchmark writes it into report.json and trials into provenance (kev/benchmark.py:212, kev/experiment.py:333-336); AGENTS.md states what 'fp32-exact' does and does not guarantee (AGENTS.md:427-439).",
+      "refs": [
+        "kev/predictors.py:67",
+        "kev/benchmark.py:212",
+        "kev/experiment.py:333",
+        "AGENTS.md:427",
+        "tests/test_conventions.py:58"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adopt",
+      "principle_fit": [
+        "P3",
+        "P7",
+        "Z7"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "which agy version, model id, hook-file hashes and device produced a measured host fact, so two re-tests are compared only when comparable",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Each host-contract re-test receipt carries agy version, model id, both hooks.json hashes, PRoot and Android build; comparisons across fingerprints are reported as drift, never as treatment effects.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-18",
+      "name": "Factorial drift attribution: code versus dependencies",
+      "statement": "When repeated reads disagree, old and new code are each run under old and new dependency kernels on the same inputs, separating code drift, dependency drift and nondeterminism.",
+      "mechanism": "drift-v1 swapped the convolution kernel in place and ran the old commit and main under both, finding no code drift, one dependency change (causal-conv1d) and no nondeterminism; the change moved Kev-27B probabilities by up to 0.059 and flipped 0.4% of answers (runs/drift-v1/REPORT.md:12-21, :51-54, :64).",
+      "refs": [
+        "runs/drift-v1/REPORT.md:12",
+        "runs/drift-v1/REPORT.md:51",
+        "runs/drift-v1/REPORT.md:64"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adapt",
+      "principle_fit": [
+        "P7",
+        "Z6",
+        "Z7"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "whether a change in measured agy behaviour comes from G1's code, the agy/model version, or run-to-run variance",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "On any host-contract drift, rerun the probe as a 2x2 (previous/current G1 commit x previous/current agy where installable) plus a same-configuration repeat, and record the attribution in the measurement ledger.",
+      "cost": "medium"
+    },
+    {
+      "id": "KEV-19",
+      "name": "Refuse results if evaluator code changed",
+      "statement": "A trial hashes all source files at start and refuses to rank its result if they changed during the run, and a resumed evaluation is refused if any evaluator file differs.",
+      "mechanism": "source_hashes covers kev/*.py, uv.lock, pyproject and modal_app (kev/experiment.py:135-137); checks run before training and after scoring (kev/experiment.py:229-230, kev/experiment.py:361-362); EVALUATOR_FILES bounds what may differ on resume (kev/experiment.py:132, kev/experiment.py:243-245).",
+      "refs": [
+        "kev/experiment.py:132",
+        "kev/experiment.py:135",
+        "kev/experiment.py:229",
+        "kev/experiment.py:361",
+        "tests/test_research.py:193"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "duplicate-of:T1 completion gate binding the current source and tree",
+      "verdict": "adapt",
+      "principle_fit": [
+        "P5",
+        "Z6"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that a measurement result was produced by one fixed version of G1's hook and check code",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Hash G1's hook scripts, both hooks.json layers and the fixtures before and after each measurement batch (the agent can rewrite hooks.json for the next session) and discard the batch on any change.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-20",
+      "name": "No partial scores; count every rejection",
+      "statement": "A read is valid only if every requested record and question was evaluated, and any rejected or failed record is counted and listed rather than silently dropped.",
+      "mechanism": "evaluate_records tracks requested, evaluated, rejected and truncated counts, writes failure.json and re-raises unless skip_overlong, and lists rejected ids (kev/benchmark.py:124-168); gate_report's complete_coverage gate (kev/experiment.py:190); the legacy evaluator refuses partial metrics (kev/evaluate.py:35).",
+      "refs": [
+        "kev/benchmark.py:124",
+        "kev/experiment.py:190",
+        "kev/evaluate.py:35",
+        "tests/test_research.py:128",
+        "tests/test_research.py:145"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adopt",
+      "principle_fit": [
+        "P4",
+        "Z7",
+        "P8"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that a measurement's denominator equals the registered fixture set (timed-out and crashed sessions are counted, not dropped)",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Measurement receipts carry requested, completed and failed session counts; a batch with any unaccounted session is incomplete and cannot pass a criterion.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-21",
+      "name": "Refuse over-length input instead of truncating",
+      "statement": "An input longer than the context is refused with its exact size and the limit, and truncation happens only when explicitly enabled and is then reported on every response.",
+      "mechanism": "admit raises ContextOverflow with token counts unless truncate (kev/model.py:130-142); Server.submit turns it into a 422 (kev/serve.py:132-142); a truncating server adds truncated and state_tokens fields to every body (kev/serve.py:211-220).",
+      "refs": [
+        "kev/model.py:130",
+        "kev/serve.py:132",
+        "kev/serve.py:211",
+        "tests/test_unit.py:461"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adapt",
+      "principle_fit": [
+        "P3",
+        "Z5"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that G1's injected fact blocks and the evidence its checks read are complete, or that truncation is explicit",
+      "hook_mapping": "PreInvocation",
+      "g1_design": "Cap SessionStart/PreInvocation injectSteps by bytes; if the canonical fact block would exceed the cap, inject an explicit 'N of M facts shown, full list at <path>' marker rather than cutting silently, and never feed truncated evidence to a gate.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-22",
+      "name": "Untrusted text cannot forge control delimiters",
+      "statement": "Caller text is rewritten so it can never produce the special tokens that mark state, question, option and decision boundaries.",
+      "mechanism": "user_tokens rewrites <|name|> to <¦name¦> before tokenizing because the fast tokenizer ignores split_special_tokens (kev/model.py:75-81); a hostile-text test asserts only structural delimiters appear (tests/test_unit.py:109-117).",
+      "refs": [
+        "kev/model.py:75",
+        "tests/test_unit.py:109"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "duplicate-of:vesperchant 00-instinct (trusted channel versus data channel)",
+      "verdict": "adapt",
+      "principle_fit": [
+        "Z4",
+        "Z5"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that text quoted from tool output or files inside a G1 injection cannot imitate G1's trusted fact markers",
+      "hook_mapping": "PreInvocation",
+      "g1_design": "Wrap G1 facts in a per-session nonce marker and escape any occurrence of the marker grammar inside quoted untrusted text before injecting.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-23",
+      "name": "Child-process probes with marker-line stdout",
+      "statement": "Risky capability checks run in a fresh child process with a timeout and suppressed core dumps, and only a prefixed marker line from its stdout counts as the result.",
+      "mechanism": "select runs _run_probe in a subprocess bounded by KEV_DEVICE_PROBE_TIMEOUT; explicit devices fail closed while auto falls back to CPU (kev/device.py:42-65, kev/device.py:75-83); RLIMIT_CORE is zeroed in the child (kev/device.py:9-13); only lines with PROBE_PREFIX count (kev/device.py:18-20).",
+      "refs": [
+        "kev/device.py:9",
+        "kev/device.py:18",
+        "kev/device.py:42",
+        "kev/device.py:75",
+        "tests/test_device.py:45",
+        "tests/test_device.py:65",
+        "tests/test_device.py:96"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adapt",
+      "principle_fit": [
+        "P4",
+        "P6",
+        "Z7"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that a hook's stdout carries exactly G1's decision JSON (empty means no decision, {} means deny) even when helper tools print banners or crash",
+      "hook_mapping": "PreToolUse",
+      "g1_design": "Hook scripts run verification helpers as children with captured stdout and timeouts, parse only a nonce-prefixed result line, and themselves print a single JSON object or nothing.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-24",
+      "name": "Worst-case admission bound; stop when unmeasurable",
+      "statement": "Before any launch the worst-case cost of everything running plus the new job is compared with the authorization, and the session stops if current spend cannot be read.",
+      "mechanism": "compute_bound multiplies hourly rate, timeout, trials and retries (kev/budget.py:85-88); session() stops when spent minus start plus budgets exceeds the cap or when billing returns None (kev/autoresearch.py:61-71); the docs require the check before every launch with a reserve (docs/autoresearch.md:30-43).",
+      "refs": [
+        "kev/budget.py:85",
+        "kev/autoresearch.py:61",
+        "docs/autoresearch.md:30",
+        "tests/test_rounds.py:1272"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "duplicate-of:T1 bounded loops",
+      "verdict": "adapt",
+      "principle_fit": [
+        "Z7",
+        "P6"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that a measurement batch of agy sessions cannot exceed its registered call or time budget",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "The measurement runner computes max sessions x max turns x timeout before starting and refuses when the bound exceeds the registered budget or when usage cannot be read.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-25",
+      "name": "Autonomous session proposes, never confirms",
+      "statement": "An unattended research session may launch registered work and compute read-outs, but confirmation reads are printed as commands for a deliberate step and never executed by the session.",
+      "mechanism": "session() prints the confirm commands for each candidate and stops (kev/autoresearch.py:8-12, kev/autoresearch.py:78-80); 'Confirmation is deliberate, never automatic' (docs/autoresearch.md:111-114); the may-not list forbids evaluator edits and --allow-test outside confirmation (docs/autoresearch.md:126-134).",
+      "refs": [
+        "kev/autoresearch.py:8",
+        "kev/autoresearch.py:78",
+        "docs/autoresearch.md:111",
+        "docs/autoresearch.md:126",
+        "tests/test_rounds.py:1272"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "duplicate-of:T1 verification that the harness runs itself",
+      "verdict": "adopt",
+      "principle_fit": [
+        "P4",
+        "P5",
+        "Z1"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that no completion or confirmation is issued by the agent itself",
+      "hook_mapping": "Stop",
+      "g1_design": "Already G1's model: the agent only produces candidate work; completion is issued solely by G1's own verifier run and receipt.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-26",
+      "name": "Leases with staleness derived from measurements",
+      "statement": "Each long attempt is written to a ledger before it starts and holds a heartbeat lease, and the stale threshold is derived arithmetically from the longest measured blocking operations.",
+      "mechanism": "LEASE_STALE = 30 s grace + 523 s worst observed commit + 60 s heartbeat, rounded to 900 s (kev/budget.py:33-44); lease_state is none/ended/fresh/stale (kev/budget.py:102-107); pending attempts count against the bound and unledgered history counts as exhausted (kev/budget.py:91-99).",
+      "refs": [
+        "kev/budget.py:33",
+        "kev/budget.py:91",
+        "kev/budget.py:102",
+        "tests/test_unit.py:1967"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "duplicate-of:T1 single active task with pending journal",
+      "verdict": "adapt",
+      "principle_fit": [
+        "Z7",
+        "P8"
+      ],
+      "principle_conflict": [
+        "P8: G1 already has a single active task; only the timeout-derivation practice is new"
+      ],
+      "proof_purpose": "that G1's timeouts (hook budget, Stop wait, lease staleness) are justified by measured worst cases rather than guesses",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Derive every G1 timeout from recorded maxima of measured agy and hook durations plus explicit margins, and store the derivation next to the constant.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-27",
+      "name": "Scripted probes re-measure platform semantics",
+      "statement": "When a platform behaves unexpectedly, a seconds-long probe reproduces the behaviour and the resulting constant cites it.",
+      "mechanism": "modal_retry_probe reproduces Modal's timed-out retry accounting in seconds on CPU (scripts/modal_retry_probe.py:1-12) and underlies FULL_FT_RETRIES and retries=0 (kev/budget.py:26-32, modal_app.py:973-975).",
+      "refs": [
+        "scripts/modal_retry_probe.py:1",
+        "kev/budget.py:26",
+        "modal_app.py:973"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adopt",
+      "principle_fit": [
+        "P7",
+        "Z7"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that each measured agy hook fact (fail-closed PreToolUse, {} means deny, at most 10 Stop continues, layer order) still holds for the installed agy version",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Keep one scripted probe per host fact; rerun the probe suite when the agy version or hook hashes change, and stop relying on any fact whose probe fails.",
+      "cost": "medium"
+    },
+    {
+      "id": "KEV-28",
+      "name": "Published numbers must trace to reports",
+      "statement": "Every number printed in the README and model cards is listed with the report file and key path it comes from, and CI fails when the printed digits differ from the source value.",
+      "mechanism": "verify() checks that the printed string occurs in each listed file and that the source value, scaled and formatted to the printed precision, equals it (scripts/verify_claims.py:42-67); 998 claims (docs/claims.json); CI runs it (tests/test_conventions.py:82-85). The docstring admits presence-not-position matching (scripts/verify_claims.py:10-12).",
+      "refs": [
+        "scripts/verify_claims.py:10",
+        "scripts/verify_claims.py:42",
+        "docs/claims.json:1",
+        "tests/test_conventions.py:82"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adapt",
+      "principle_fit": [
+        "P5",
+        "Z4",
+        "Z5"
+      ],
+      "principle_conflict": [
+        "P8: completion already requires a receipt, so this only proves the honesty of the agent's summary"
+      ],
+      "proof_purpose": "that any figure the agent reports at completion (tests passed, files changed) equals the corresponding field of G1's receipt",
+      "hook_mapping": "Stop",
+      "g1_design": "At Stop, extract numeric claims next to known keys from the final message and compare them with the bound receipt; a mismatch or a claim with no receipt returns continue with the exact discrepancy. Bind by key, not by mere presence.",
+      "cost": "medium"
+    },
+    {
+      "id": "KEV-29",
+      "name": "Single canonical home lint per rule",
+      "statement": "A CI test lists rules that may be implemented in exactly one file and fails on any regex match elsewhere.",
+      "mechanism": "RULES is a table of (what, regex, allowed files) scanned over kev, scripts, space, tests and modal_app (tests/test_conventions.py:15-63, tests/test_conventions.py:88-100); the verify skill forbids widening the allowlist to pass (.agents/skills/kev-verify/SKILL.md:24-26).",
+      "refs": [
+        "tests/test_conventions.py:15",
+        "tests/test_conventions.py:88",
+        ".agents/skills/kev-verify/SKILL.md:24"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adapt",
+      "principle_fit": [
+        "P8"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that each G1 fact (receipt hash, ledger append, deny decision, tree hash) is produced by exactly one implementation",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Add a lint table to G1's tests: only the ledger module appends, only the gate module prints PreToolUse decisions, only one module computes the tree hash.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-30",
+      "name": "Differential parity replay against previous version",
+      "statement": "A refactor is accepted only when the old code (from a worktree) and the new code produce bit-identical outputs on the same inputs.",
+      "mechanism": "kev-verify runs benchmark and training from a worktree of main and from the checkout and requires max |delta| = 0.0 on rows, reports and adapter tensors (.agents/skills/kev-verify/SKILL.md:8-10, :73-99); test_rounds recomputes committed read-outs exactly (tests/test_rounds.py:581-611).",
+      "refs": [
+        ".agents/skills/kev-verify/SKILL.md:8",
+        ".agents/skills/kev-verify/SKILL.md:73",
+        "tests/test_rounds.py:581"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adopt",
+      "principle_fit": [
+        "P4",
+        "P8",
+        "Z6"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that a change to G1's hook code changes no decision on the recorded corpus of hook inputs unless the change is declared",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Record every hook stdin G1 receives (redacted), replay the corpus through the previous and new hook versions in a scrubbed environment, and require identical stdout decisions except registered differences.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-31",
+      "name": "Pin third-party agent instructions by hash",
+      "statement": "Skills installed from other repositories are recorded with source, path and a computed content hash in a lockfile.",
+      "mechanism": "skills-lock.json lists deslop, grill-me and unslop with sourceType github and computedHash (skills-lock.json:1-22); AGENTS.md says they are reinstalled with npx skills add (AGENTS.md:361-362). No verifying code is in this checkout.",
+      "refs": [
+        "skills-lock.json:8",
+        "AGENTS.md:361"
+      ],
+      "evidence_quality": "claimed-only",
+      "novelty": "new",
+      "verdict": "adapt",
+      "principle_fit": [
+        "Z6",
+        "Z7",
+        "P3"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that rule or skill files G1 injects are byte-identical to the versions G1 approved",
+      "hook_mapping": "SessionStart",
+      "g1_design": "Keep the sha256 of every rule file G1 may inject in the global root-of-trust; refuse to inject a file whose hash differs and record the mismatch.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-32",
+      "name": "Hash-pinned exclusions applied to both arms",
+      "statement": "Items can be excluded from a comparison only through a registered list whose sha256 is checked, and the same rows leave both sides.",
+      "mechanism": "panel_filter applies exclude_sources, exclude_tasks and exclude_file {path, sha256} to both sides, and compare records how many were excluded (kev/rounds.py:223, kev/rounds.py:247-260, kev/rounds.py:855-856); exclusions are chosen on label validity before any read-out (docs/autoresearch.md:227-230).",
+      "refs": [
+        "kev/rounds.py:223",
+        "kev/rounds.py:247",
+        "kev/rounds.py:855",
+        "docs/autoresearch.md:227",
+        "tests/test_rounds.py:869"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adapt",
+      "principle_fit": [
+        "Z6",
+        "Z7"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that an A/B result was not shaped by dropping inconvenient sessions after seeing outcomes",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Measurement specs may name an exclusion file only by hash, registered before the run; the runner removes those fixtures from both arms and reports the count.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-33",
+      "name": "Freeze thresholds on fresh data",
+      "statement": "A decision threshold for an error budget is selected on a separate calibration set and applied unchanged to the final test, with the empirical envelope stated as no guarantee.",
+      "mechanism": "select_threshold and evaluate_threshold separate choosing from applying (kev/metrics.py:149-164); the registered protocol's deployment policy (experiments/calibration-audit-protocol.json:47); the metric policy labels coverage_at_error as not a deployed guarantee (kev/benchmark.py:95-103).",
+      "refs": [
+        "kev/metrics.py:149",
+        "kev/metrics.py:157",
+        "experiments/calibration-audit-protocol.json:47",
+        "kev/benchmark.py:96",
+        "tests/test_research.py:320"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adapt",
+      "principle_fit": [
+        "Z7"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that G1's control thresholds (the displacement or oscillation cut-off that ends Stop continuations) are validated on sessions not used to choose them",
+      "hook_mapping": "Stop",
+      "g1_design": "Choose control thresholds on development fixtures, freeze them with their hash in the spec, and report their behaviour on a fresh holdout before deployment.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-34",
+      "name": "Matched placebo and re-read baseline controls",
+      "statement": "A candidate must beat a matched control that received the same extra training without the intervention and the unchanged parent re-evaluated now, not an old report.",
+      "mechanism": "The calibration screen shares data and augmentations with a CE control arm, re-evaluates the pinned parent and requires gains against each (experiments/calibration-audit-protocol.json:56-66); the review is tested to require beating the continuation control, not just the parent (tests/test_research.py:670).",
+      "refs": [
+        "experiments/calibration-audit-protocol.json:56",
+        "experiments/calibration-audit-protocol.json:64",
+        "tests/test_research.py:670"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adopt",
+      "principle_fit": [
+        "Z7",
+        "P8"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that an injected rule's effect comes from its content, not from extra tokens or a newer host or model run",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Every A/B of injected content includes a length- and position-matched placebo injection arm and a same-day no-injection baseline, all on identical fixtures.",
+      "cost": "medium"
+    },
+    {
+      "id": "KEV-35",
+      "name": "Ensembles admitted only on paired evidence",
+      "statement": "Averaging over option rotations reduced order flips, while averaging two training seeds gave no separated gain, so ensembles are kept as options with paired intervals rather than assumed to help.",
+      "mechanism": "RotationAveraged averages logits over cyclic option rotations (kev/predictors.py:213-251); Kev-4B flip rate 0.083 -> 0.028 on 36 permuted items with 16 rotations (runs/r4-kev-4b-v4-one/report.json:1244, runs/r4-kev-4b-v4-rot/report.json:1244); the two-seed Kev-9B average moved accuracy -0.5 pp [-1.5, +0.8] and coverage at 5% +3.4 pp [-3.7, +11.3] (runs/r4-average-9b/report.json:30-56; PLAN.md:263).",
+      "refs": [
+        "kev/predictors.py:213",
+        "runs/r4-kev-4b-v4-rot/report.json:1244",
+        "runs/r4-average-9b/report.json:30",
+        "PLAN.md:263",
+        "tests/test_research.py:913"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adapt",
+      "principle_fit": [
+        "Z7",
+        "P8"
+      ],
+      "principle_conflict": [
+        "P8: repetition belongs only to measurement, never to the authority path"
+      ],
+      "proof_purpose": "whether repeating a host-contract probe or an agent run k times narrows the measured interval enough to justify its cost",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Treat repeated agy runs as an ensemble only in measurement: aggregate per-fixture outcomes across repeats, keep the repeat count only if paired evidence shows a narrower estimate, and permute injected-rule order across repeats to measure order sensitivity.",
+      "cost": "medium"
+    },
+    {
+      "id": "KEV-36",
+      "name": "Fixed canary probe detects isolation leaks",
+      "statement": "A fixed sibling question containing a secret code is placed next to real questions, and any movement of their answers beyond 0.001 fails the mechanism gate.",
+      "mechanism": "ISOLATION_PROBE carries the secret CRANE-9274 (kev/experiment.py:167-168); mechanism_checks compares alone, packed and with-sibling probabilities (kev/experiment.py:171-185); test_isolation checks whether a sibling's secret is readable (kev/evaluate.py:109-123); a single-home rule pins the canary (tests/test_conventions.py:45-46).",
+      "refs": [
+        "kev/experiment.py:167",
+        "kev/experiment.py:171",
+        "kev/evaluate.py:109",
+        "tests/test_conventions.py:45",
+        "tests/test_research.py:655"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adapt",
+      "principle_fit": [
+        "P3",
+        "Z7"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that content G1 injects in one session (ephemeralMessage) or one hook layer does not leak into later sessions, transcripts or memory",
+      "hook_mapping": "SessionStart",
+      "g1_design": "In host-contract re-tests, inject a per-run nonce canary via SessionStart or PreInvocation and search the next fresh session's transcript and memory files for it; any hit invalidates the ephemerality assumption.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-37",
+      "name": "Validated envelope via non-inferiority buckets",
+      "statement": "A capability is claimed only up to the largest length bucket whose paired difference from the reference bucket has a lower bound within a pre-set margin, with every record answered.",
+      "mechanism": "The rule fixed before the read (docs/model-cards/kev-4b.md:211) yields 8,192 tokens for 0.8B/4B/9B and 65,536 for 27B (README.md:38); calibration_by_length buckets metrics by state tokens (kev/metrics.py:190-221).",
+      "refs": [
+        "docs/model-cards/kev-4b.md:211",
+        "README.md:38",
+        "kev/metrics.py:190",
+        "tests/test_research.py:1000"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adapt",
+      "principle_fit": [
+        "Z7",
+        "P8"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "up to which session length or transcript size a G1 control (Stop continuation, injection) is shown not to degrade",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Bucket A/B fixtures by turn count or transcript bytes; publish the largest bucket whose paired lower bound stays within the margin as G1's validated envelope and flag sessions beyond it.",
+      "cost": "medium"
+    },
+    {
+      "id": "KEV-38",
+      "name": "Held-out temperature fit with leakage refusal",
+      "statement": "One temperature is fitted by minimum NLL on held-out datasets, reported with an out-of-fold group-disjoint estimate and bootstrap interval, and fits on data sharing sources with training are refused unless the override is recorded.",
+      "mechanism": "fit_temperature grid search (kev/metrics.py:276-294); cross_validated_temperature with grouped folds (kev/metrics.py:317-369); calibrate_checkpoint refuses in-distribution rows and writes any override and manual reason into head.pt (scripts/calibrate_checkpoint.py:6-19, :121-135, :153-156); in-distribution temperatures did not transfer (PLAN.md:204-217).",
+      "refs": [
+        "kev/metrics.py:276",
+        "kev/metrics.py:351",
+        "scripts/calibrate_checkpoint.py:6",
+        "scripts/calibrate_checkpoint.py:127",
+        "PLAN.md:204",
+        "tests/test_research.py:463",
+        "tests/test_rounds.py:967"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "research",
+      "principle_fit": [
+        "Z7"
+      ],
+      "principle_conflict": [
+        "P8: G1 has no probabilistic score of its own to calibrate today"
+      ],
+      "proof_purpose": "none currently; relevant only if a probabilistic signal enters G1's measurement layer",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "If a probabilistic signal is ever introduced, fit its calibration only on task families disjoint from those used to design it, and store fit-set hashes and any override reason with the parameter.",
+      "cost": "medium"
+    },
+    {
+      "id": "KEV-39",
+      "name": "Inject computed facts, not computation requests",
+      "statement": "Arithmetic the model does badly (day counts between dates) is computed deterministically and appended to the input as plain sentences, which raised deadline-policy accuracy.",
+      "mechanism": "date_facts emits one sentence per pair of absolute dates (kev/api.py:62-91); KEV_DATE_FACTS=1 applies it at serving (kev/serve.py:31, kev/serve.py:223-225); Kev-9B deadline accuracy 0.80 -> 0.90 (README.md:387) and Kev-4B 0.60 -> 0.85 on an earlier checkpoint (docs/model-cards/kev-4b.md:280).",
+      "refs": [
+        "kev/api.py:66",
+        "kev/serve.py:223",
+        "README.md:387",
+        "docs/model-cards/kev-4b.md:280"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "duplicate-of:vesperchant PreInvocation ground-truth injection",
+      "verdict": "adopt",
+      "principle_fit": [
+        "P2",
+        "P4",
+        "PH"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "none new; it is supporting evidence for injecting G1-computed facts (pass/fail vector, Hamming distance to goal) instead of asking the agent to derive them",
+      "hook_mapping": "PreInvocation",
+      "g1_design": "PreInvocation injects the current acceptance pass/fail vector and distance to goal as computed facts, never as instructions to compute them.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-40",
+      "name": "Repeat target name for irreversible publish",
+      "statement": "Publishing to a public repository requires naming it twice, private is the default, and an existing public repository is refused for private uploads.",
+      "mechanism": "release_publish exits unless confirm_public equals repo (modal_app.py:710-715); kev.mirror.ensure_private refuses public repos (kev/mirror.py:49); the docs forbid Hub changes without the owner's explicit OK (docs/autoresearch.md:126-130).",
+      "refs": [
+        "modal_app.py:715",
+        "kev/mirror.py:49",
+        "docs/autoresearch.md:126",
+        "tests/test_unit.py:2203"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "duplicate-of:vesperchant 3-tier hooks (PreToolUse risk gate)",
+      "verdict": "reject",
+      "principle_fit": [
+        "Z6"
+      ],
+      "principle_conflict": [
+        "Z1: an untrusted agent can repeat the target name, so repetition is not evidence",
+        "P6: as a human confirmation it is a manual touch"
+      ],
+      "proof_purpose": "none",
+      "hook_mapping": "PreToolUse",
+      "g1_design": "n/a: G1's existing deny/force_ask risk gate covers irreversible commands; repetition defends against human slips, not an adversarial agent.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-41",
+      "name": "Transcript-derived knowledge graph as memory",
+      "statement": "Earlier agent sessions are distilled nightly into a private notes repository that agents search before re-deriving history.",
+      "mechanism": "The kev-knowledge skill clones jaredpalmer/kev-knowledge and reads topic notes, session notes and transcripts, ranking topics above transcripts and preferring docs/claims.json for published numbers (.agents/skills/kev-knowledge/SKILL.md:18-26, :67-68, :84-88).",
+      "refs": [
+        ".agents/skills/kev-knowledge/SKILL.md:18",
+        ".agents/skills/kev-knowledge/SKILL.md:67",
+        ".agents/skills/kev-knowledge/SKILL.md:84"
+      ],
+      "evidence_quality": "claimed-only",
+      "novelty": "new",
+      "verdict": "reject",
+      "principle_fit": [],
+      "principle_conflict": [
+        "P3: transcripts and memory are never state",
+        "Z5: distilled notes are the agent's own presented evidence"
+      ],
+      "proof_purpose": "none",
+      "hook_mapping": "n/a",
+      "g1_design": "n/a: G1 continues from its own facts only; at most such notes could be an untrusted hint that is never read as state.",
+      "cost": "medium"
+    },
+    {
+      "id": "KEV-42",
+      "name": "Resident local decision server with cache",
+      "statement": "One process holds the checkpoint, batches queued requests on a single model thread, and caches the state prefix so repeated documents pay only for question rows.",
+      "mechanism": "PrefixCache and Server (kev/serve.py:38-91, kev/serve.py:93-191); the server binds 127.0.0.1 but is open by default and sets wildcard CORS (kev/serve.py:33, kev/serve.py:229, kev/serve.py:333); on an Apple M5 Kev-0.8B takes 149 ms for new text and 28 ms cached (README.md:416-421).",
+      "refs": [
+        "kev/serve.py:38",
+        "kev/serve.py:93",
+        "kev/serve.py:229",
+        "kev/serve.py:333",
+        "README.md:416",
+        "tests/test_unit.py:236"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "reject",
+      "principle_fit": [],
+      "principle_conflict": [
+        "P2/P6: a resident multi-GB daemon on the phone is new infrastructure outside the native agent",
+        "Z1: a localhost server with wildcard CORS and no key can be queried by any local page or process"
+      ],
+      "proof_purpose": "none",
+      "hook_mapping": "n/a",
+      "g1_design": "n/a: G1 hooks stay short-lived processes; if a judge were ever run for offline measurement it would need a key, no CORS and its own process lifecycle.",
+      "cost": "high"
+    },
+    {
+      "id": "KEV-43",
+      "name": "Disclose every arm tried and negatives",
+      "statement": "Every round reports all arms with their failed criteria, selects one candidate per size, and logs negative findings with evidence so they are not repeated.",
+      "mechanism": "Standing rules: 'One candidate per size' with the number of arms tried and 'Report negative results as fully as positive ones' (PLAN.md:299-300, PLAN.md:318); a negative-results list (PLAN.md:255-273); the read-out table prints failed criteria per arm (kev/rounds.py:957-982).",
+      "refs": [
+        "PLAN.md:255",
+        "PLAN.md:299",
+        "PLAN.md:318",
+        "kev/rounds.py:957"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adopt",
+      "principle_fit": [
+        "Z6",
+        "Z7"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "how many injected-rule variants were tried before one was adopted (multiple-comparison context for its measured gain)",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "The measurement ledger records every variant evaluated, its verdict and failed criteria; adoption receipts cite the number of variants tried.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-44",
+      "name": "N-gram contamination screen against fixtures",
+      "statement": "Generated or training records are screened against every evaluation item by exact normalised match, word 8-gram Jaccard and containment before use.",
+      "mechanism": "screen_overlap compares normalised states, questions and word 8-grams against external benchmark items and writes counts only (scripts/screen_overlap.py:1-12); Kev-27B's corpus dropped 6,388 records at Jaccard > 0.2 or containment >= 0.5 (docs/model-cards/kev-27b.md:176).",
+      "refs": [
+        "scripts/screen_overlap.py:1",
+        "docs/model-cards/kev-27b.md:176",
+        "evals/hard-v1/manifest.json:1"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adapt",
+      "principle_fit": [
+        "Z7"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that injected rule text or examples do not contain the answers to A/B fixtures (no teaching to the test)",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Before an A/B run, screen injected content against fixture prompts and expected outputs with exact and 8-gram overlap; refuse runs above the registered threshold.",
+      "cost": "low"
+    },
+    {
+      "id": "KEV-45",
+      "name": "Role-labelled, group-disjoint fixture splits",
+      "statement": "Sources are declared trainable or evaluation-only, training refuses evaluation-only sources, and splits keep every sibling variant of one item in the same partition.",
+      "mechanism": "TRAINABLE/EVAL_ONLY policy (kev/data.py:283-291) enforced by validate_training and the trainer (kev/suite.py:181-196, kev/train.py:113-116); grouped_folds keep (source, group) units together (kev/metrics.py:317-330).",
+      "refs": [
+        "kev/data.py:289",
+        "kev/suite.py:181",
+        "kev/train.py:113",
+        "kev/metrics.py:317",
+        "tests/test_research.py:215",
+        "tests/test_skill_scripts.py:54",
+        "tests/test_generators.py:72"
+      ],
+      "evidence_quality": "tested",
+      "novelty": "new",
+      "verdict": "adapt",
+      "principle_fit": [
+        "Z7",
+        "P8"
+      ],
+      "principle_conflict": [],
+      "proof_purpose": "that variants of one task fixture never straddle the development and holdout sets used for rule authoring and confirmation",
+      "hook_mapping": "outside-hooks",
+      "g1_design": "Tag each fixture family as authoring or evaluation-only and give variants of a task one group id; the runner refuses authoring-time reads of evaluation-only families and splits by group.",
+      "cost": "low"
+    }
+  ],
+  "adoption_candidates": [
+    "KEV-04: paired fixture-clustered bootstrap is exactly the CI machinery G1's measurement layer needs; tested and dependency-light.",
+    "KEV-05: pre-registered JSON rules with CI-bound primaries and guards and a pass/fail/incomplete verdict make A/B tests and host re-tests mechanical.",
+    "KEV-15: planted single-defect mutants test G1's own completion gate against false completion, fully deterministically.",
+    "KEV-11: withheld-evidence twins turn the 3-of-8 'DONE anyway' observation into a paired, repeatable primary metric.",
+    "KEV-10: McNemar sizing stops underpowered agy re-tests before they spend sessions.",
+    "KEV-30: differential replay of recorded hook inputs guards every G1 code change (Z6).",
+    "KEV-13: one-fact minimal pairs with ablation and invariance checks prove each G1 check reacts to exactly its fact.",
+    "KEV-17: execution fingerprints (agy version, model, hook hashes, device) make host facts comparable across runs.",
+    "KEV-20: the complete-coverage rule keeps crashed or timed-out sessions in the denominator.",
+    "KEV-06: criterion-path validation is a working instance of G1's coverage-matrix zero-row rule.",
+    "KEV-27: one scripted probe per measured agy fact keeps host knowledge re-verifiable when agy changes.",
+    "KEV-07: a hash-pinned holdout read once prevents tuning injected rules on their confirmation set.",
+    "KEV-34: placebo-length and same-day baseline arms separate content effects from token count and host drift.",
+    "KEV-23: child-process helpers with marker-line parsing keep hook stdout a single clean decision.",
+    "KEV-08: a retired-probe registry keeps noisy host probes from gating while preserving history.",
+    "KEV-18: 2x2 drift attribution separates G1 changes from agy or model changes.",
+    "KEV-28: claim-to-receipt matching at Stop catches numerically false completion summaries.",
+    "KEV-21: explicit truncation markers keep injected fact blocks honest.",
+    "KEV-22: nonce-marked fact blocks with escaping stop quoted tool output from impersonating G1.",
+    "KEV-09: reliability audits and pooled guards prevent gating on noise.",
+    "KEV-33: thresholds frozen on development fixtures validate Stop-continuation cut-offs on fresh data.",
+    "KEV-45: group-disjoint, role-labelled fixture splits keep task variants from leaking across authoring and holdout."
+  ],
+  "risks": [
+    "Security: the server sets wildcard CORS (kev/serve.py:229) and is open unless KEV_API_KEY is set (kev/serve.py:33, README.md:292); run as a daemon on the phone, any local page or process could query it.",
+    "Deserialization: head.pt is loaded with torch.load from Hub downloads (kev/checkpoint.py:76-77, kev/checkpoint.py:43-45); it is safe only because pyproject pins torch>=2.6 with the weights_only default (pyproject.toml:28).",
+    "Network calls: Hugging Face model and dataset downloads at load time (kev/checkpoint.py:43-45, kev/suite.py:223-241) and a Hub API call at every server start for Hub ids (kev/checkpoint.py:208-214); Jev reads via Vercel AI Gateway with key provisioning through the vercel CLI (kev/jev.py:13-23, playground/scripts/jev-evaluate.mjs:9-19); data generation posts to OpenAI-compatible endpoints (skills/kev-finetune/scripts/generate_data.py:32, :95-99); training and serving run on Modal (modal_app.py:82, modal_app.py:181).",
+    "Prompt-injection text: evals/devtools-v1 partitions intentionally contain Gandalf attack prompts (evals/devtools-v1/manifest.json:178); AGENTS.md, docs/autoresearch.md and .agents/skills/* are long agent-directed instruction sets, e.g. a skill granting Exec(gh repo clone ...) (.agents/skills/kev-knowledge/SKILL.md:9-15); all were treated as data.",
+    "Quality: the prompt-injection evaluation confounds source with label (positives only Gandalf attacks, negatives only deepset benign prompts, some in German) (evals/devtools-v1/manifest.json:178), so the 0.547 / 0.753 scores may partly measure dataset style.",
+    "Quality: no latency or memory figures exist for Linux aarch64, Termux/PRoot or Android; CPU evidence is one Mac arm64 Qwen2.5-0.5B smoke run (runs/smoke-hl/00-trial-0/result.json:410-412), and DeltaNet layers fall back to reference PyTorch code off CUDA/MLX (kev/mlx_model.py:4).",
+    "Quality: the phone-sized model is weak on G1-like decisions: Kev-0.8B When2Call 0.133 on test (below chance) and prompt injection 0.547 (docs/model-cards/kev-0.8b.md:252-253, :278); some devtools labels are proxies (docs/model-cards/kev-4b.md:278).",
+    "Quality: the validated context is 8,192 tokens for 0.8B/4B/9B (README.md:38), shorter than many agy transcripts; bf16 serving differs from fp32 evaluation by up to 0.05 in probability (README.md:427).",
+    "Quality: the shipped 0.8B and 4B temperatures were fitted on in-distribution rows, which the project's own rules now forbid (docs/model-cards/kev-0.8b.md:155, :243; PLAN.md:204-217); Kev-27B was selected after test results were known (docs/model-cards/kev-27b.md:279).",
+    "Reproducibility: outputs drift with dependency kernels (causal-conv1d moved Kev-27B probabilities by up to 0.059 and flipped 0.4% of answers) (runs/drift-v1/REPORT.md:12-21, :64), so model scores cannot sit in an exact-hash authority path.",
+    "Unverifiable claims: the agent-session and guardrail data behind Kev-27B's agents-ood score (docs/model-cards/kev-27b.md:168, :259) are private mirrors (evals/agents-ood-v1/manifest.json:66, evals/sft-v2/manifest.json:783), as is the split-half audit code (kev/suite.py:62-66).",
+    "License: code is Apache-2.0 (LICENSE), but training data includes share-alike sets and an MIT-style licence with a model-as-a-service condition (docs/model-cards/kev-27b.md:174); adopting methods carries no burden, reusing data or weights would.",
+    "Supply chain: a heavy pinned stack (torch, transformers 5.x, peft, flash-linear-attention 0.5.2 whose kernel launches kev/fused_qwen35.py patches) is a poor fit for Termux/PRoot (pyproject.toml:21-30, kev/fused_qwen35.py:53).",
+    "Telemetry: no analytics SDK found in runtime code; Jev reads request zero data retention (playground/scripts/jev-evaluate.mjs:18)."
+  ]
+}

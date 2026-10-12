@@ -1,0 +1,30 @@
+{"event": "SessionStart", "t": 1791700215.5340583, "cid": "19f3aefc", "stepIdx": null, "inv": null, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PreInvocation", "t": 1791700215.6603339, "cid": "19f3aefc", "stepIdx": null, "inv": 0, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PostInvocation", "t": 1791700218.6599636, "cid": "19f3aefc", "stepIdx": null, "inv": 0, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PreInvocation", "t": 1791700218.7719624, "cid": "19f3aefc", "stepIdx": null, "inv": 1, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PreToolUse", "t": 1791700223.4790585, "cid": "19f3aefc", "stepIdx": 3, "inv": null, "tool": "run_command", "args": "{\"CommandLine\": \"ls -la\", \"Cwd\": \"/tmp/g1-probes/agy-cover/runs-cap/k4-force-continue/ws\", \"WaitMsBeforeAsync\": 5000, \"toolAction\": \"Checking workspace contents\", \"toolSummary\": \"Check workspace contents\"}", "fullyIdle": null, "reason": null}
+{"event": "PostToolUse", "t": 1791700224.27348, "cid": "19f3aefc", "stepIdx": 3, "inv": null, "tool": "run_command", "args": "{\"CommandLine\": \"ls -la\", \"Cwd\": \"/tmp/g1-probes/agy-cover/runs-cap/k4-force-continue/ws\", \"WaitMsBeforeAsync\": 5000, \"toolAction\": \"Checking workspace contents\", \"toolSummary\": \"Check workspace contents\"}", "fullyIdle": null, "reason": null}
+{"event": "PostInvocation", "t": 1791700224.4122748, "cid": "19f3aefc", "stepIdx": null, "inv": 1, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PreInvocation", "t": 1791700224.5422456, "cid": "19f3aefc", "stepIdx": null, "inv": 2, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PostInvocation", "t": 1791700230.4750152, "cid": "19f3aefc", "stepIdx": null, "inv": 2, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PreInvocation", "t": 1791700230.6105769, "cid": "19f3aefc", "stepIdx": null, "inv": 3, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PostInvocation", "t": 1791700241.5639906, "cid": "19f3aefc", "stepIdx": null, "inv": 3, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PreInvocation", "t": 1791700241.693674, "cid": "19f3aefc", "stepIdx": null, "inv": 4, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PostInvocation", "t": 1791700244.6919167, "cid": "19f3aefc", "stepIdx": null, "inv": 4, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PreInvocation", "t": 1791700244.8101249, "cid": "19f3aefc", "stepIdx": null, "inv": 5, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PostInvocation", "t": 1791700248.3445766, "cid": "19f3aefc", "stepIdx": null, "inv": 5, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PreInvocation", "t": 1791700248.4629405, "cid": "19f3aefc", "stepIdx": null, "inv": 6, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PostInvocation", "t": 1791700252.6726563, "cid": "19f3aefc", "stepIdx": null, "inv": 6, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PreInvocation", "t": 1791700252.808234, "cid": "19f3aefc", "stepIdx": null, "inv": 7, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PostInvocation", "t": 1791700257.160656, "cid": "19f3aefc", "stepIdx": null, "inv": 7, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PreInvocation", "t": 1791700257.2821486, "cid": "19f3aefc", "stepIdx": null, "inv": 8, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PostInvocation", "t": 1791700260.846575, "cid": "19f3aefc", "stepIdx": null, "inv": 8, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PreInvocation", "t": 1791700260.9640539, "cid": "19f3aefc", "stepIdx": null, "inv": 9, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PostInvocation", "t": 1791700264.04999, "cid": "19f3aefc", "stepIdx": null, "inv": 9, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PreInvocation", "t": 1791700264.1859918, "cid": "19f3aefc", "stepIdx": null, "inv": 10, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PostInvocation", "t": 1791700266.4363935, "cid": "19f3aefc", "stepIdx": null, "inv": 10, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PreInvocation", "t": 1791700266.5755916, "cid": "19f3aefc", "stepIdx": null, "inv": 11, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PostInvocation", "t": 1791700270.150798, "cid": "19f3aefc", "stepIdx": null, "inv": 11, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PreInvocation", "t": 1791700270.282761, "cid": "19f3aefc", "stepIdx": null, "inv": 12, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "PostInvocation", "t": 1791700272.8338327, "cid": "19f3aefc", "stepIdx": null, "inv": 12, "tool": null, "args": null, "fullyIdle": null, "reason": null}
+{"event": "Stop", "t": 1791700272.9534748, "cid": "19f3aefc", "stepIdx": null, "inv": null, "tool": null, "args": null, "fullyIdle": true, "reason": "NO_TOOL_CALL"}
